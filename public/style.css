@@ -244,6 +244,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .budget-row + .budget-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .budget-input { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 8px; }
 .budget-who { font-size: 14px; overflow-wrap: anywhere; }
+.budget-who small { color: var(--muted); font-size: 12px; }
 
 /* ---------- 列表 ---------- */
 

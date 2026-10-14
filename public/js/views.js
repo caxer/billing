@@ -2,7 +2,7 @@
 
 import * as calc from './calc.js';
 import { budgetFor, all as allSettings } from './settings.js';
-import { transactionSummary, GROUPS, UTILITY_PAYER } from './billing.js';
+import { transactionSummary, GROUPS, UTILITY_PAYER, utilityBudget } from './billing.js';
 import { esc } from './html.js';
 
 const tile = (label, value, mod, sub) => `
@@ -214,7 +214,7 @@ export function records(items, filters) {
 
 export function settings(ctx) {
   const { people, members = people, expenseCats, incomeCats, month, me, theme, budgets = {}, isLocal } = ctx;
-  const totalLimit = people.reduce((sum, person) => sum + budgetFor(person, month), 0);
+  const totalLimit = members.reduce((sum, person) => sum + budgetFor(person, month), 0);
   const catTags = (list, kind) => list
     .map((c) => `<span class="tag">${esc(c)}<button type="button" data-del-cat="${kind}" data-category="${esc(c)}" aria-label="刪除 ${esc(c)}">×</button></span>`)
     .join('');
@@ -240,14 +240,16 @@ export function settings(ctx) {
         <div class="budget-head"><span class="budget-title">${calc.monthLabel(month)}支出額度</span>
           <span class="budget-num">${totalLimit ? `合計 ${calc.money(totalLimit)} 元` : '未設定'}</span></div>
         ${people.map((person, index) => {
-          if (person === UTILITY_PAYER) return '';
-          const limit = budgetFor(person, month);
+          // 土銀是水電氣的年度預算，其他人是每月額度。
+          const yearly = person === UTILITY_PAYER;
+          const period = yearly ? month.slice(0, 4) : month;
+          const limit = yearly ? utilityBudget({ budgets }, period) : budgetFor(person, month);
           return `
           <div class="budget-input">
-            <span class="budget-who">${personLabel(person, index)}</span>
-            <input id="set-budget-${index}" type="number" inputmode="numeric" placeholder="${limit ? calc.money(limit) : '未設定'}" title="填 0 取消上限；沒設定的月份沿用預設"
-                   value="${esc(budgets[person]?.[month] ?? '')}" aria-label="${esc(person)}本月支出額度" min="0" step="1"/>
-            <button type="button" class="btn-quiet" data-budget-person="${esc(person)}" data-budget-index="${index}">套用</button>
+            <span class="budget-who">${personLabel(person, index)}${yearly ? ` <small>${period}</small>` : ''}</span>
+            <input id="set-budget-${index}" type="number" inputmode="numeric" placeholder="${limit ? calc.money(limit) : '未設定'}" title="${yearly ? `${period} 年水電氣預算，填 0 取消` : '填 0 取消上限；沒設定的月份沿用預設'}"
+                   value="${esc(budgets[person]?.[period] ?? '')}" aria-label="${esc(person)}${yearly ? `${period} 年度預算` : '本月支出額度'}" min="0" step="1"/>
+            <button type="button" class="btn-quiet" data-budget-person="${esc(person)}" data-budget-index="${index}" data-budget-period="${period}">套用</button>
           </div>`;
         }).join('')}
       </div>

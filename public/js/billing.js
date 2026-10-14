@@ -16,6 +16,9 @@ const ITEMS = {
 };
 /** 水電氣由土銀帳戶扣款，記在土銀名下；它不是手機使用者，也沒有額度。 */
 export const UTILITY_PAYER = '土銀';
+/** 土銀某年的水電氣預算，存在 budgets.土銀.<年>；沒設定回傳 0。 */
+export const utilityBudget = (settings, year) =>
+  Number(settings?.budgets?.[UTILITY_PAYER]?.[year] ?? settings?.budgets?.[UTILITY_PAYER]?.default ?? 0);
 export const BILLING_CATEGORIES = Object.entries(ITEMS).flatMap(([group, items]) => items.map((item) => `${group}／${item}`));
 export const validMonth = (value) => /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value || '');
 
@@ -171,6 +174,13 @@ export function annualReport(year, records, history, cutoff, mappings = {}, hist
     }
     return { ...transactionSummary(records[month] || [], mappings), month, source: 'transactions', conflict: false };
   });
+}
+
+/** 年度已入帳的水電氣，對照土銀年度預算；待補與缺資料月份不計。 */
+export function utilityBudgetUsage(months, limit) {
+  const counted = months.filter((m) => ['history', 'transactions'].includes(m.source));
+  const spent = counted.reduce((sum, m) => sum + m.utilities, 0);
+  return { spent, limit, left: limit - spent, used: limit ? Math.round((spent / limit) * 100) : 0, skipped: months.length - counted.length };
 }
 
 export function reportTotals(months) {

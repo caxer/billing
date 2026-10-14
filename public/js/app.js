@@ -616,7 +616,7 @@ function bindSettings() {
         await settings.save((s) => {
           s.budgets = s.budgets || {};
           s.budgets[person] = s.budgets[person] || {};
-          s.budgets[person][targetMonth] = value;
+          s.budgets[person][budgetBtn.dataset.budgetPeriod || targetMonth] = value;
         });
         toast(`${person}的額度已更新`);
       }

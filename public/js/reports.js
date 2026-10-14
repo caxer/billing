@@ -145,6 +145,17 @@ function summaryTiles(totals, label, previous) {
     <p class="tile-period">${esc(label)}${previous && pct !== null ? ` · 去年同期 ${amount(previous.total)}` : ''}</p></div>`;
 }
 
+function utilityBudgetView(months) {
+  const { spent, limit, left, used, skipped } = billing.utilityBudgetUsage(months, billing.utilityBudget(context.settings(), year));
+  if (!limit) return '';
+  const over = left < 0;
+  return `<div class="card utility-budget" title="水電氣由土銀扣款，在設定頁調整">
+    <div class="budget-head"><span class="budget-title">${billing.UTILITY_PAYER}年度預算</span><span class="budget-num">${money(spent)} / ${money(limit)}</span></div>
+    <div class="bar" role="progressbar" aria-label="${billing.UTILITY_PAYER}年度預算使用進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, used)}" aria-valuetext="已用 ${used}%"><div class="bar-fill ${over ? 'is-over' : used >= 80 ? 'is-warn' : ''}" style="width:${Math.min(100, used)}%"></div></div>
+    <p class="budget-note ${over ? 'is-over' : ''}">${over ? `已超出 ${money(-left)} 元` : `還可用 ${money(left)} 元`} · 已用 ${used}%${skipped ? ` · 未含 ${skipped} 個月` : ''}</p>
+  </div>`;
+}
+
 function yearView() {
   const n = elapsed(year), months = monthsFor(year), current = months.slice(0, n).filter((m) => m.source !== 'pending');
   const totals = billing.reportTotals(current);
@@ -154,7 +165,7 @@ function yearView() {
   const conflicts = current.filter((m) => m.conflict);
   const missing = current.some((m) => m.source === 'missing');
   const stats = billing.reportStats(current);
-  return `${summaryTiles(totals, label, n ? previous : null)}
+  return `${summaryTiles(totals, label, n ? previous : null)}${utilityBudgetView(months)}
     ${missing ? '<p class="report-notice">部分月份缺資料，合計顯示「—」</p>' : ''}
     ${hasPending ? '<p class="report-notice">待補月結月份不計入合計</p>' : ''}
     ${conflicts.length ? `<p class="report-notice">${conflicts.map((m) => m.month).join('、')} 只採歷史月結</p>` : ''}
