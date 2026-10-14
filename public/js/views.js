@@ -2,7 +2,7 @@
 
 import * as calc from './calc.js';
 import { budgetFor, all as allSettings } from './settings.js';
-import { transactionSummary, GROUPS } from './billing.js';
+import { transactionSummary, GROUPS, UTILITY_PAYER } from './billing.js';
 import { esc } from './html.js';
 
 const tile = (label, value, mod, sub) => `
@@ -56,7 +56,7 @@ function budgetCard(items, month, people) {
     index,
     spent: calc.summarize(items.filter((it) => it.by === person)).expense,
     limit: budgetFor(person, month),
-  }));
+  })).filter((row) => row.person !== UTILITY_PAYER);
   if (!rows.some((row) => row.limit)) return '';
   return `<div class="card">
     <div class="budget-head"><span class="budget-title">本月額度</span></div>
@@ -213,7 +213,7 @@ export function records(items, filters) {
 /* ---------- 設定 ---------- */
 
 export function settings(ctx) {
-  const { people, expenseCats, incomeCats, month, me, theme, budgets = {}, isLocal } = ctx;
+  const { people, members = people, expenseCats, incomeCats, month, me, theme, budgets = {}, isLocal } = ctx;
   const totalLimit = people.reduce((sum, person) => sum + budgetFor(person, month), 0);
   const catTags = (list, kind) => list
     .map((c) => `<span class="tag">${esc(c)}<button type="button" data-del-cat="${kind}" data-category="${esc(c)}" aria-label="刪除 ${esc(c)}">×</button></span>`)
@@ -224,7 +224,7 @@ export function settings(ctx) {
       <div class="card">
         <div class="setting-row">
           <div class="setting-name" title="記帳時預設選這個人">這支手機是</div>
-          <select id="set-me" aria-label="這支手機的預設記帳人" style="max-width:150px">${people.map((p) => `<option ${p === me ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+          <select id="set-me" aria-label="這支手機的預設記帳人" style="max-width:150px">${members.map((p) => `<option ${p === me ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
         </div>
         <div class="setting-row">
           <div class="setting-name">外觀</div>
@@ -240,6 +240,7 @@ export function settings(ctx) {
         <div class="budget-head"><span class="budget-title">${calc.monthLabel(month)}支出額度</span>
           <span class="budget-num">${totalLimit ? `合計 ${calc.money(totalLimit)} 元` : '未設定'}</span></div>
         ${people.map((person, index) => {
+          if (person === UTILITY_PAYER) return '';
           const limit = budgetFor(person, month);
           return `
           <div class="budget-input">

@@ -14,6 +14,8 @@ const ITEMS = {
   兒子: ['美語', '安親班', '補習班', '註冊費', '保險(郵局)', '課照', '其他'],
   水電氣: ['電費', '水費', '燃氣'],
 };
+/** 水電氣由土銀帳戶扣款，記在土銀名下；它不是手機使用者，也沒有額度。 */
+export const UTILITY_PAYER = '土銀';
 export const BILLING_CATEGORIES = Object.entries(ITEMS).flatMap(([group, items]) => items.map((item) => `${group}／${item}`));
 export const validMonth = (value) => /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value || '');
 
@@ -35,6 +37,10 @@ export function upgradeSettings(value) {
   if (!next.billingVersion) {
     next.expenseCategories = [...new Set([...(next.expenseCategories || []), ...BILLING_CATEGORIES])];
     next.billingVersion = 1;
+  }
+  if (next.billingVersion < 2) {
+    next.people = [...new Set([...(next.people || []), UTILITY_PAYER])];
+    next.billingVersion = 2;
   }
   next.billingGroups ||= {};
   return next;

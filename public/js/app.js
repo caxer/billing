@@ -6,7 +6,7 @@ import * as settings from './settings.js';
 import * as calc from './calc.js';
 import * as views from './views.js';
 import { readStored, writeStored, removeStored } from './storage.js';
-import { classify, GROUPS } from './billing.js';
+import { classify, GROUPS, UTILITY_PAYER } from './billing.js';
 import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
 
@@ -77,7 +77,7 @@ document.addEventListener('visibilitychange', () => {
 /** 還沒決定這支手機是誰時問一次；不問的話所有裝置都會落到名單第一個人。 */
 function askWho() {
   const box = $('#who');
-  const people = settings.people();
+  const people = settings.members();
   if (!people.length) return Promise.resolve('');
   return new Promise((resolve) => {
     $('#who-choices').replaceChildren(...people.map((person) => {
@@ -192,11 +192,12 @@ function renderSettings() {
     $('#view-settings').textContent = '設定尚未載入，請按右上角同步重試。';
     return;
   }
-  const meValue = me || all.people[0];
+  const meValue = me || settings.members()[0];
   // 重畫時保留使用者展開的區塊，刪完一個分類不會又收起來。
   const opened = [...document.querySelectorAll('#view-settings details[open]')].map((el) => el.id);
   $('#view-settings').innerHTML = views.settings({
     people: all.people,
+    members: settings.members(),
     expenseCats: all.expenseCategories,
     incomeCats: all.incomeCategories,
     month,
@@ -245,10 +246,19 @@ function updateCategoryHint() {
         ? '會計入月消費總額及扣除列項後開銷。' : `會計入${group}分類及月消費總額。`;
 }
 
+/** 選到水電氣時改記在土銀名下，改回其他分類時還給這支手機的人。 */
+function applyUtilityPayer() {
+  if (!settings.people().includes(UTILITY_PAYER)) return;
+  const by = $('#add-by');
+  const utility = addType === 'expense' && classify($('#add-category').value, settings.all()?.billingGroups) === '水電氣';
+  if (utility) by.value = UTILITY_PAYER;
+  else if (by.value === UTILITY_PAYER && me) by.value = me;
+}
+
 function refreshFormOptions() {
   const people = settings.people();
-  if (!people.includes(me)) {
-    me = people[0] || '';
+  if (!settings.members().includes(me)) {
+    me = settings.members()[0] || '';
     writeStored('spa-me', me);
   }
   const selected = $('#add-by').value;
@@ -266,6 +276,7 @@ function setAddType(type) {
   $('#amount-sign').textContent = type === 'income' ? '+' : '−';
   $('.amount-row').classList.toggle('is-income', type === 'income');
   fillCategories(type);
+  applyUtilityPayer();
 }
 
 /** 清掉目前這個月的全部紀錄。連按兩次確認，且不可復原。 */
@@ -467,7 +478,10 @@ function bind() {
   $('#add-date').addEventListener('change', (e) => setDate(e.target.value));
 
   $('#add-form').addEventListener('submit', submitForm);
-  $('#add-category').addEventListener('change', updateCategoryHint);
+  $('#add-category').addEventListener('change', () => {
+    updateCategoryHint();
+    applyUtilityPayer();
+  });
 
   $('#view-billing').addEventListener('click', async (e) => {
     if (!e.target.closest('#billing-show-records') || working) return;
@@ -635,18 +649,18 @@ function bindSettings() {
 
       if (delPersonBtn) {
         const name = delPersonBtn.dataset.delPerson;
-        if (settings.people().length <= 1) throw new Error('請至少保留一位記帳人');
+        if (!settings.members().some((p) => p !== name)) throw new Error('請至少保留一位記帳人');
         const used = state.allItems().filter((it) => it.by === name).length;
         const tail = used ? `本月有 ${used} 筆紀錄記在這個人名下，紀錄不會被刪除。` : '本月沒有這個人的紀錄。';
         if (!confirm(`確定刪除記帳人「${name}」？${tail}`)) return;
         await settings.save((s) => {
           const remaining = s.people.filter((p) => p !== name);
-          if (!remaining.length) throw new Error('請至少保留一位記帳人');
+          if (!remaining.some((p) => p !== UTILITY_PAYER)) throw new Error('請至少保留一位記帳人');
           s.people = remaining;
           if (s.budgets) delete s.budgets[name];
         });
         if (me === name) {
-          me = settings.people()[0];
+          me = settings.members()[0];
           writeStored('spa-me', me);
           toast(`已刪除，這支手機改用「${me}」`);
         } else {
@@ -719,7 +733,7 @@ async function start() {
   try {
     await settings.load();
     // 沒選過、或選的人已經不在名單裡，就先問一次再往下走。
-    if (!settings.people().includes(me)) {
+    if (!settings.members().includes(me)) {
       me = await askWho();
       writeStored('spa-me', me);
     }
