@@ -297,6 +297,18 @@ export function settings(ctx) {
         </div>
       </div>
 
+      ${isLocal ? `<div class="card"><h2 class="section-title">修改網站密碼</h2>
+        <p class="setting-hint">驗證舊密碼後自動發布。帳本資料與既有 Face ID 保留。</p>
+        <form id="local-password-form" class="stack" style="margin-top:12px">
+          <label class="field"><span class="field-label">舊密碼</span><input name="oldPassword" type="password" autocomplete="current-password" required maxlength="1024"></label>
+          <label class="field"><span class="field-label">新密碼</span><input name="newPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="1024" placeholder="至少 12 個字"></label>
+          <label class="field"><span class="field-label">再次輸入新密碼</span><input name="confirmPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="1024"></label>
+          <button type="submit" class="btn-quiet btn-block">修改密碼並發布</button>
+        </form>
+        <p id="local-password-status" class="setting-hint" role="status" aria-live="polite"></p>
+        <button id="local-password-retry" type="button" class="btn-quiet btn-block" hidden>重試發布新密碼</button>
+      </div>` : ''}
+
       ${!isLocal ? `<div class="card"><h2 class="section-title">Face ID／生物辨識</h2>
         <p class="setting-hint">${biometric.enabled ? '已啟用。重新開啟帳本時，需要裝置驗證或帳本密碼。' : '啟用後用 Face ID、Touch ID 或裝置驗證解鎖；登入資訊會加密保存。'}</p>
         ${biometric.enabled && !biometric.pending ? '<button type="button" class="btn-quiet btn-block" id="set-biometric-disable">停用生物辨識</button>' : `<button type="button" class="btn-quiet btn-block" id="set-biometric-enable"${biometric.available ? '' : ' disabled data-unavailable'}>${biometric.pending ? '完成 Face ID 設定' : '啟用 Face ID／生物辨識'}</button>`}

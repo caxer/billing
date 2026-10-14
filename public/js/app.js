@@ -10,6 +10,7 @@ import { classify, GROUPS } from './billing.js';
 import * as reports from './reports.js';
 import { errorMessage as biometricError } from './biometric.js';
 import { initLoginScreen } from './login-screen.js';
+import { initLocalPassword } from './local-password.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -23,6 +24,7 @@ const ui = {
 };
 
 const loginScreen = initLoginScreen(ui.lock);
+const localPassword = store.isLocal() ? initLocalPassword($('#view-settings')) : null;
 
 const TITLES = { dashboard: '看板', add: '記帳', stats: '統計', billing: '月結', settings: '設定' };
 
@@ -242,6 +244,7 @@ function renderSettings() {
     isLocal: store.isLocal(),
     biometric: { available: biometricAvailable, enabled: store.biometricEnabled(), pending: store.biometricPending() },
   });
+  localPassword?.refresh();
 }
 
 /* ---------- 記帳表單 ---------- */
