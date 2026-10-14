@@ -506,6 +506,10 @@ function bind() {
     });
   }
 
+  // 從原生日曆選日期不會經過 setDate，要另外同步按鈕文字。
+  $('#add-date').addEventListener('input', (e) => setDate(e.target.value));
+  $('#add-date').addEventListener('change', (e) => setDate(e.target.value));
+
   $('#add-form').addEventListener('submit', submitForm);
   $('#add-category').addEventListener('change', updateCategoryHint);
 
