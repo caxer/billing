@@ -8,9 +8,7 @@ import * as views from './views.js';
 import { readStored, writeStored, removeStored } from './storage.js';
 import { classify, GROUPS } from './billing.js';
 import * as reports from './reports.js';
-import { errorMessage as biometricError } from './biometric.js';
 import { initLoginScreen } from './login-screen.js';
-import { initLocalPassword } from './local-password.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -23,8 +21,7 @@ const ui = {
   monthLabel: $('#month-label'),
 };
 
-const loginScreen = initLoginScreen(ui.lock);
-const localPassword = store.isLocal() ? initLocalPassword($('#view-settings')) : null;
+const loginScreen = initLoginScreen(ui.lock, { onKey: (key) => unlockAccount(key, true) });
 
 const TITLES = { dashboard: '看板', add: '記帳', stats: '統計', billing: '月結', settings: '設定' };
 
@@ -38,12 +35,9 @@ let me = readStored('spa-me') || '';
 let theme = readStored('spa-theme') || 'auto';
 let working = false;
 let dataReady = false;
-let biometricAvailable = false;
 let unlocking = false;
-let resumeAfterUnlock = false;
 let stopWatching = () => {};
 const filters = { query: '', type: '', by: '' };
-const SKIP_AUTO_BIOMETRIC = 'spa-skip-auto-biometric';
 
 /* ---------- 部署更新偵測 ---------- */
 
@@ -76,19 +70,6 @@ async function checkVersion() {
   }
 }
 
-const autoFace = FaceIDCore.autoLogin({
-  enabled: () => !store.isLocal() && store.biometricEnabled() && biometricAvailable,
-  unlocked: () => !ui.app.hidden,
-  busy: () => unlocking || working,
-  promptBusy: () => unlocking || !!document.querySelector('#set-biometric-enable:disabled:not([data-unavailable])'),
-  suspend: () => {
-    resumeAfterUnlock = true;
-    if (!working) suspendAccount();
-    else { ui.app.hidden = true; prepareLock(); }
-  },
-  unlock: () => unlockAccount(true, true),
-  restore: () => location.reload(),
-});
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkVersion();
 });
@@ -139,27 +120,6 @@ function setWorking(value) {
     control.disabled = value || control.hasAttribute('data-unavailable');
   }
   renderSync();
-  // 等進行中的寫入結束才鎖定，避免中斷已送出的記帳。
-  if (!value && resumeAfterUnlock && !unlocking) {
-    suspendAccount();
-    void autoFace.resume();
-  }
-}
-
-function prepareLock() {
-  const enabled = store.biometricEnabled();
-  loginScreen.render({ visible: true, hasCredential: enabled && biometricAvailable, busy: unlocking, passwordLabel: '解鎖帳本資料' });
-  $('#lock-hint').textContent = enabled
-    ? biometricAvailable ? '每次開啟或回到網站會自動驗證；取消後可重試或使用密碼。' : '目前瀏覽器無法使用 Face ID，請使用密碼登入。'
-    : '先用密碼登入，再到設定啟用 Face ID／通行金鑰。';
-}
-
-function suspendAccount() {
-  stopWatching();
-  reports.setActive(false);
-  store.lock();
-  ui.app.hidden = true;
-  prepareLock();
 }
 
 /* ---------- 提示 ---------- */
@@ -244,10 +204,8 @@ function renderSettings() {
     theme,
     budgets: all.budgets || {},
     isLocal: store.isLocal(),
-    biometric: { available: biometricAvailable, enabled: store.biometricEnabled(), pending: store.biometricPending() },
   });
   for (const id of opened) { const el = document.getElementById(id); if (el) el.open = true; }
-  localPassword?.refresh();
 }
 
 /* ---------- 記帳表單 ---------- */
@@ -479,12 +437,6 @@ async function switchMonth(target = month, refreshSettings = false) {
 /* ---------- 事件 ---------- */
 
 function bind() {
-  $('#lock-biometric').addEventListener('click', () => unlockAccount(true));
-  document.querySelector('#lock-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await unlockAccount(false);
-  });
-
   for (const tab of document.querySelectorAll('.tab')) {
     tab.addEventListener('click', () => show(tab.dataset.view));
   }
@@ -597,30 +549,14 @@ function bindSettings() {
     const budgetBtn = e.target.closest('[data-budget-person]');
     const renameBtn = e.target.closest('[data-rename-person]');
     const delPersonBtn = e.target.closest('[data-del-person]');
-    if (e.target.closest('#set-biometric-enable, #set-biometric-disable')) {
-      if (working) return;
-      setWorking(true);
-      try {
-        if (e.target.closest('#set-biometric-enable')) {
-          const result = await store.enableBiometrics();
-          toast(result.pending ? '請再點「完成 Face ID 設定」，完成裝置驗證。' : '已啟用 Face ID／生物辨識');
-        } else {
-          store.disableBiometrics();
-          toast('已停用生物辨識，恢復記住登入');
-        }
-        renderSettings();
-      } catch (err) { toast(biometricError(err)); }
-      finally { setWorking(false); }
-      return;
-    }
     if (e.target.closest('[data-go="billing"]')) return show('billing');
     if (e.target.closest('#set-export')) return exportCsv();
     if (e.target.closest('#set-clear')) return clearMonthRecords();
     if (e.target.closest('#set-lock')) {
-      // 主動鎖定保持在解鎖畫面；下一次開啟再自動驗證。
-      writeStored(SKIP_AUTO_BIOMETRIC, '1', 'sessionStorage');
+      if (working || !confirm('移除後，這台裝置要重新點專屬連結才能開啟帳本。確定移除？')) return;
       reports.lock();
       store.lock();
+      if (!(await LinkKey.forget())) return toast('無法移除登入，請允許網站儲存後再試');
       location.reload();
       return;
     }
@@ -750,36 +686,28 @@ function exportCsv() {
 
 /* ---------- 啟動 ---------- */
 
-async function unlockAccount(useBiometric, automatic = false) {
-  if (unlocking || (resumeAfterUnlock && working)) return;
-  if (resumeAfterUnlock && !ui.app.hidden) suspendAccount();
+/** 金鑰來自網址（fresh）或這台裝置；解得開才記住網址帶來的金鑰。 */
+async function unlockAccount(key, fresh) {
+  if (unlocking) return;
   unlocking = true;
-  loginScreen.render({ busy: true });
-  const error = $('#lock-error');
-  error.hidden = true;
+  loginScreen.render({ busy: true, message: '' });
   try {
-    if (useBiometric) await store.unlockWithBiometrics();
-    else await store.unlock($('#lock-password').value);
-    $('#lock-password').value = '';
-    loginScreen.hidePassword();
-    if (resumeAfterUnlock) {
-      resumeAfterUnlock = false;
-      loginScreen.render({ visible: false });
-      ui.app.hidden = false;
-      await switchMonth(month, true);
-      reports.setActive(view === 'billing');
-    } else await start();
+    await store.unlock(key);
+    const remembered = !fresh || await LinkKey.save(key);
+    await start();
+    if (!remembered) toast('這個瀏覽器無法記住登入，下次仍需用專屬連結開啟');
   } catch (err) {
-    error.textContent = automatic && ['NotAllowedError', 'AbortError', 'SecurityError'].includes(err.name)
-      ? '未完成自動生物辨識，請點 Face ID 按鈕重試，或使用帳本密碼。'
-      : useBiometric ? biometricError(err) : err.message === '找不到 secret.json'
-      ? '這個網站還沒設定。請在電腦上執行 npm run setup 後重新發布。' : err.message || '密碼錯誤';
-    error.hidden = false;
+    if (err.code === 'revoked' && !fresh) await LinkKey.forget();
+    showLock(err.message === '找不到 secret.json' ? '這個網站還沒設定。請在電腦上執行 npm run setup 後重新發布。' : err.message || '無法開啟帳本');
   } finally {
     unlocking = false;
     loginScreen.render({ busy: false });
-    void autoFace.resume();
   }
+}
+
+function showLock(message) {
+  ui.app.hidden = true;
+  loginScreen.render({ visible: true, message });
 }
 
 async function start() {
@@ -822,15 +750,11 @@ async function boot() {
     if (!working) render();
   });
   if (store.isLocal()) return start();
-  biometricAvailable = await store.canUseBiometrics();
-  const skipAutomatic = readStored(SKIP_AUTO_BIOMETRIC, 'sessionStorage') === '1';
-  removeStored(SKIP_AUTO_BIOMETRIC, 'sessionStorage');
-  if (await store.restore()) return start();
-  const enabled = store.biometricEnabled();
-  prepareLock();
-  if (enabled && biometricAvailable) {
-    if (!skipAutomatic) await autoFace.start();
-  }
+  store.clearLegacy();
+  let found;
+  try { found = await LinkKey.current(); } catch (err) { return showLock(err.message); }
+  if (!found) return showLock('');
+  await unlockAccount(found.key, found.fresh);
 }
 
 boot();

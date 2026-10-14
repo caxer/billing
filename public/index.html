@@ -21,23 +21,13 @@
 <div id="lock" class="auth-screen">
   <div class="login-page">
     <div class="login-brand"><span class="brand-mark"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z M4 9h16 M8 13h3 M8 16h7"/></svg></span>帳本紀錄</div>
-    <div class="login-intro"><span class="eyebrow">YOUR MONEY, AT A GLANCE</span><h1>每一筆收支，<br>清楚記錄。</h1><p>家庭收支與月結，一個地方就看得到。</p></div>
-    <section class="login-card" aria-label="登入帳本紀錄">
-      <span class="login-lock"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path data-login-icon d="M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2"/></svg></span>
-      <h2 id="lock-title">解鎖你的帳本</h2>
-      <p class="muted" id="lock-hint">每次開啟或回到網站會自動驗證；取消後可重試或使用密碼。</p>
-      <div class="login-options" data-login-face hidden>
-        <button type="button" class="login-primary" id="lock-biometric" data-login-biometric hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H4v4 M16 3h4v4 M4 17v4h4 M20 17v4h-4 M8 9v2 M16 9v2 M12 9v4h-1 M8 16s4 3 8 0"/></svg><span data-login-biometric-label>Face ID／通行金鑰登入</span></button>
-        <button type="button" class="text-button" data-login-password-choice>使用密碼登入</button>
-      </div>
-      <form id="lock-form" class="login-form" data-login-password><input class="autofill-username" name="username" autocomplete="username" value="billing-owner" tabindex="-1" aria-hidden="true">
-          <label for="lock-password">登入密碼</label>
-          <div class="password-field"><input id="lock-password" data-login-field name="password" type="password" autocomplete="current-password" placeholder="輸入原本的密碼" aria-label="帳本密碼" enterkeyhint="go" required><button id="lock-password-toggle" data-login-toggle type="button" class="password-toggle" aria-controls="lock-password" aria-label="顯示密碼" aria-pressed="false">顯示</button></div>
-          <button id="lock-submit" type="submit" class="login-primary"><span data-login-submit-label>解鎖帳本內容</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14 M14 7l5 5-5 5"/></svg></button>
-          <button type="button" class="text-button" data-login-face-choice hidden>改用 Face ID 登入</button></form>
-      <p id="lock-error" class="login-error" role="alert" hidden></p>
+    <div class="login-intro"><h1>每一筆收支，<br>清楚記錄。</h1></div>
+    <section class="login-card" aria-label="開啟帳本紀錄">
+      <span class="login-lock"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+      <h2 id="lock-title">用專屬連結開啟</h2>
+      <button type="button" class="login-primary" data-login-paste title="點過一次專屬連結，這台裝置就會記住。主畫面 App 第一次請先複製連結再按這裡。連結就是鑰匙，請勿轉傳。"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span data-login-paste-label>貼上專屬連結</span></button>
+      <p id="lock-error" class="login-error" role="alert" data-login-error hidden></p>
     </section>
-    <p class="privacy-note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2"/></svg>資料加密保護，密碼不會儲存於網站。</p>
   </div>
 </div>
 

@@ -113,9 +113,10 @@ function draw() {
   }
   const status = root.querySelector('#billing-status');
   status.classList.toggle('is-expense', !!error);
-  status.textContent = error ? `${error}，按右上角同步重試` :
-    !initialized ? '讀取中…' : lastSync ? `同步於 ${lastSync.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}` : '';
-  status.title = archive ? `歷史月結至 ${billing.historyEnd(archive)} · 正式記帳 ${archive.cutoverMonth} 起` : '';
+  status.textContent = error ? `${error}，按右上角同步重試` : !initialized ? '讀取中…' : '';
+  status.hidden = !status.textContent;
+  root.querySelector('#billing-year').title = [lastSync && `同步於 ${lastSync.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
+    archive && `歷史月結至 ${billing.historyEnd(archive)} · 正式記帳 ${archive.cutoverMonth} 起`].filter(Boolean).join(' · ');
   const content = root.querySelector('#billing-content');
   if (!initialized) { content.innerHTML = '<div class="card"><p class="empty">尚未載入</p></div>'; return; }
   const expanded = new Set([...content.querySelectorAll('details[open]')].map((el) => el.id));
@@ -172,13 +173,13 @@ function kpiView(stats, previous) {
   const pctText = percentage === null ? '—' : `${percentage > 0 ? '+' : ''}${percentage.toFixed(1)}%`;
   const peak = stats.highest, low = stats.lowest;
   const values = [
-    ['月平均', amount(stats.average), `${stats.averageCount} 個有支出月份`],
+    ['月平均', amount(stats.average), '', `${stats.averageCount} 個有支出月份`],
     ['較去年同期', pctText, stats.totals.total === null || previous.total === null ? '缺少可比資料' : `${stats.totals.total >= previous.total ? '多花' : '少花'} ${amount(Math.abs(stats.totals.total - previous.total))}`],
     ['最大支出類別', top?.name || '—', top ? `${amount(top.amount)} · ${stats.totals.total ? (top.amount / stats.totals.total * 100).toFixed(1) : 0}%` : '—'],
     ['最高月份', peak ? `${Number(peak.month.slice(-2))}月` : '—', peak ? amount(peak.total) : '—'],
     ['最低月份', low ? `${Number(low.month.slice(-2))}月` : '—', low ? amount(low.total) : '—'],
   ];
-  return `<div class="report-kpis" aria-label="期間重點指標">${values.map(([name, value, sub]) => `<div class="card"><span class="setting-hint">${name}</span><strong>${esc(value)}</strong><span class="setting-hint">${esc(sub)}</span></div>`).join('')}</div>`;
+  return `<div class="report-kpis" aria-label="期間重點指標">${values.map(([name, value, sub, tip = '']) => `<div class="card"${tip ? ` title="${esc(tip)}"` : ''}><span class="setting-hint">${name}</span><strong>${esc(value)}</strong>${sub ? `<span class="setting-hint">${esc(sub)}</span>` : ''}</div>`).join('')}</div>`;
 }
 
 const sourceLabel = (source) => ({ history: '歷史月結', transactions: '即時記帳', pending: '待補月結', missing: '缺少歷史' }[source] || '—');

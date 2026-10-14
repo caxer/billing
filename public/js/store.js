@@ -7,10 +7,10 @@
 // GitHub 沒有推播，「即時」靠輪詢檔案 sha。寫入必須帶目前 sha，
 // 兩台手機同時改同個月會拿到 409，由呼叫端重試。
 
-import { readStored, writeStored, removeStored } from './storage.js';
+import { removeStored } from './storage.js';
 import { validDate } from './calc.js';
 import { validMonth, validateHistory, GROUPS } from './billing.js';
-import * as biometric from './biometric.js';
+import './link-key.js';
 import { normalizeDataCredentials } from './data-repo.js';
 
 const GITHUB_API = 'https://api.github.com';
@@ -18,60 +18,20 @@ const GITHUB_API = 'https://api.github.com';
 export const isLocal = () =>
   ['127.0.0.1', 'localhost'].includes(location.hostname);
 
-let session = null; // { owner, repo, branch, token }
-const SESSION_KEY = 'spa-session';
+let session = null; // { owner, repo, branch, token }，只放記憶體
 
 function validSession(value) {
   return value && ['owner', 'repo', 'token'].every((key) => typeof value[key] === 'string' && value[key].trim()) &&
     (value.branch === undefined || typeof value.branch === 'string');
 }
 
-function rememberSession(value) {
-  if (biometric.configured()) {
-    clearRememberedSession();
-    return;
+/** 舊版留下的明文登入與 Face ID 設定，改用專屬連結後一律清除。 */
+export function clearLegacy() {
+  for (const key of ['spa-session', 'spa-biometric']) {
+    removeStored(key);
+    removeStored(key, 'sessionStorage');
   }
-  const saved = JSON.stringify(value);
-  if (writeStored(SESSION_KEY, saved)) {
-    removeStored(SESSION_KEY, 'sessionStorage');
-  } else {
-    // 裝置不允許持久儲存時，仍可完成這次登入。
-    writeStored(SESSION_KEY, saved, 'sessionStorage');
-  }
-}
-
-function clearRememberedSession() {
-  removeStored(SESSION_KEY);
-  removeStored(SESSION_KEY, 'sessionStorage');
-}
-
-export const biometricEnabled = () => biometric.configured();
-export const biometricPending = () => biometric.hasPending();
-export const canUseBiometrics = () => !isLocal() ? biometric.available() : Promise.resolve(false);
-
-export async function enableBiometrics() {
-  if (isLocal() || !validSession(session)) throw new Error('請先用帳本密碼登入雲端帳本');
-  const result = await (biometric.hasPending() ? biometric.completeRegistration(session) : biometric.enroll(session));
-  if (result.pending) return result;
-  clearRememberedSession();
-  if (readStored(SESSION_KEY) || readStored(SESSION_KEY, 'sessionStorage')) {
-    biometric.forget();
-    throw new Error('無法更新登入儲存，請允許網站儲存後再試');
-  }
-  return result;
-}
-
-export function disableBiometrics() {
-  if (!validSession(session)) throw new Error('請先解鎖帳本');
-  biometric.forget();
-  rememberSession(session);
-}
-
-export async function unlockWithBiometrics() {
-  const unlocked = await biometric.unlock();
-  if (!validSession(unlocked)) throw new Error('登入設定格式錯誤，請使用帳本密碼');
-  session = normalizeDataCredentials(unlocked);
-  clearRememberedSession();
+  removeStored('spa-skip-auto-biometric', 'sessionStorage');
 }
 
 function contentsUrl(path) {
@@ -82,7 +42,10 @@ function contentsUrl(path) {
 
 /* ---------- 登入 ---------- */
 
-export async function unlock(password) {
+export const SECRET_CONTEXT = 'billing/secret/v2';
+
+/** 用專屬連結的金鑰（CryptoKey）解開 secret.json 裡的 token。 */
+export async function unlock(key) {
   if (isLocal()) {
     session = { local: true };
     return;
@@ -90,42 +53,14 @@ export async function unlock(password) {
   const res = await fetch('secret.json', { cache: 'no-store' });
   if (!res.ok) throw new Error('找不到 secret.json');
   const box = await res.json();
-  const { open } = await import('./crypto.js');
-  const raw = await open(box, password);
-  const unlocked = JSON.parse(raw);
+  if (box?.v !== 2 || !Array.isArray(box.slots)) throw new Error('網站尚未改用專屬連結，請在電腦執行 npm run link 後重新發布。');
+  const unlocked = JSON.parse(await LinkKey.openAny(key, box.slots, SECRET_CONTEXT));
   if (!validSession(unlocked)) throw new Error('登入設定格式錯誤');
   session = normalizeDataCredentials(unlocked);
-  rememberSession(session);
-}
-
-export async function restore() {
-  if (isLocal()) return true;
-  if (biometric.configured()) {
-    session = null;
-    clearRememberedSession();
-    return false;
-  }
-  // 優先讀取裝置上的持久登入；舊版分頁登入也會自動遷移。
-  for (const storage of ['localStorage', 'sessionStorage']) {
-    const saved = readStored(SESSION_KEY, storage);
-    if (!saved) continue;
-    try {
-      const restored = JSON.parse(saved);
-      if (!validSession(restored)) throw new Error('invalid session');
-      session = normalizeDataCredentials(restored);
-      rememberSession(session);
-      return true;
-    } catch {
-      removeStored(SESSION_KEY, storage);
-    }
-  }
-  session = null;
-  return false;
 }
 
 export function lock() {
   session = null;
-  clearRememberedSession();
 }
 
 /* ---------- 底層讀寫 ---------- */

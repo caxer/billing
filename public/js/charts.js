@@ -43,7 +43,7 @@ function frame(c, points, body, id, cumulativeAxis = null) {
   const secondary = cumulativeAxis === null ? '' : Array.from({ length: 5 }, (_, i) =>
     `<text x="${w - right + 10}" y="${top + plotHeight * i / 4 + 4}" class="chart-axis-text chart-cumulative-text">${money(cumulativeAxis.upper - (cumulativeAxis.upper - cumulativeAxis.lower) * i / 4)}</text>`).join('');
   return `<div class="chart-scroll" tabindex="0" aria-label="可左右捲動${id === 'monthly' ? '每月支出' : '趨勢'}圖"><svg class="billing-chart-svg" viewBox="0 0 ${w} ${h}" style="min-width:${w}px" role="img" aria-label="${esc(id)}圖表">
-    <text x="${left}" y="18" class="chart-axis-text">金額（元）</text>${cumulativeAxis === null ? '' : `<text x="${w - right}" y="18" class="chart-axis-text chart-cumulative-text">累積（右軸）</text>`}
+    ${cumulativeAxis === null ? '' : `<text x="${w - right}" y="18" class="chart-axis-text chart-cumulative-text">累積（右軸）</text>`}
     ${grids}<line x1="${left}" x2="${w - right}" y1="${y(0)}" y2="${y(0)}" class="chart-zero"/>${body}${axis}${secondary}${hits}</svg></div>`;
 }
 

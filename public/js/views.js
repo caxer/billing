@@ -213,7 +213,7 @@ export function records(items, filters) {
 /* ---------- 設定 ---------- */
 
 export function settings(ctx) {
-  const { people, expenseCats, incomeCats, month, me, theme, budgets = {}, isLocal, biometric = {} } = ctx;
+  const { people, expenseCats, incomeCats, month, me, theme, budgets = {}, isLocal } = ctx;
   const totalLimit = people.reduce((sum, person) => sum + budgetFor(person, month), 0);
   const catTags = (list, kind) => list
     .map((c) => `<span class="tag">${esc(c)}<button type="button" data-del-cat="${kind}" data-category="${esc(c)}" aria-label="刪除 ${esc(c)}">×</button></span>`)
@@ -279,25 +279,10 @@ export function settings(ctx) {
         </div>
       </div>
 
-      ${isLocal ? `<details class="card" id="local-password-card"><summary class="budget-title" title="驗證舊密碼後自動發布；帳本資料與 Face ID 保留">修改網站密碼</summary>
-        <form id="local-password-form" class="stack" style="margin-top:12px">
-          <label class="field"><span class="field-label">舊密碼</span><input name="oldPassword" type="password" autocomplete="current-password" required maxlength="1024"></label>
-          <label class="field"><span class="field-label">新密碼</span><input name="newPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="1024" placeholder="至少 12 個字"></label>
-          <label class="field"><span class="field-label">再次輸入新密碼</span><input name="confirmPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="1024"></label>
-          <button type="submit" class="btn-quiet btn-block">修改密碼並發布</button>
-        </form>
-        <p id="local-password-status" class="setting-hint" role="status" aria-live="polite"></p>
-        <button id="local-password-retry" type="button" class="btn-quiet btn-block" hidden>重試發布新密碼</button>
-      </details>` : ''}
-
-      ${!isLocal ? `<div class="card">
-        ${biometric.enabled && !biometric.pending ? '<button type="button" class="btn-quiet btn-block" id="set-biometric-disable" title="停用後恢復記住登入；通行密鑰可在系統密碼設定刪除">停用 Face ID</button>' : `<button type="button" class="btn-quiet btn-block" id="set-biometric-enable" title="${biometric.available ? '每台裝置各自啟用，帳本密碼仍可備援' : '此裝置沒有可用的生物辨識'}"${biometric.available ? '' : ' disabled data-unavailable'}>${biometric.pending ? '完成 Face ID 設定' : biometric.available ? '啟用 Face ID／生物辨識' : '此裝置無法用 Face ID'}</button>`}
-      </div>` : ''}
-
       <div class="setting-actions">
         <button type="button" class="btn-quiet" id="set-export" title="匯出${calc.monthLabel(month)}全部紀錄，可用 Excel 開啟">匯出 CSV</button>
         <button type="button" class="btn-quiet danger-button" id="set-clear" title="刪掉${calc.monthLabel(month)}全部紀錄，無法復原">清空本月</button>
-        ${!isLocal ? `<button type="button" class="btn-quiet" id="set-lock" title="${biometric.enabled ? '下次需要生物辨識或帳本密碼解鎖' : '清除這台裝置記住的登入'}">鎖定帳本</button>` : ''}
+        ${!isLocal ? `<button type="button" class="btn-quiet" id="set-lock" title="這台裝置下次需要重新點專屬連結">登出此裝置</button>` : ''}
       </div>
     </div>`;
 }

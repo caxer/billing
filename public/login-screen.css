@@ -2,7 +2,7 @@
 .auth-screen { position: fixed; inset: 0; z-index: 1000; overflow: auto; display: block; margin: 0; padding: 0; border: 0; background: #101419; color: #f3f6f8; color-scheme: dark; font: 16px/normal -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", system-ui, sans-serif; }
 .auth-screen[hidden], .auth-screen [hidden] { display: none !important; }
 .auth-screen *, .auth-screen *::before, .auth-screen *::after { box-sizing: border-box; }
-.auth-screen button, .auth-screen input { font: inherit; }
+.auth-screen button { font: inherit; }
 .auth-screen button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; min-height: 44px; }
 .auth-screen button:disabled { opacity: .55; }
 .auth-screen button:focus-visible { outline: 2px solid #78dcc0; outline-offset: 3px; }
@@ -11,26 +11,15 @@
 .auth-screen .login-brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; }
 .auth-screen .brand-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 13px; background: rgba(120,220,192,.12); color: #78dcc0; }
 .auth-screen .login-intro { padding: 46px 0 28px; }
-.auth-screen .eyebrow { font-size: 10px; color: #78dcc0; letter-spacing: .12em; font-weight: 600; }
 .auth-screen .login-intro h1 { margin: 13px 0; font-size: clamp(28px,8vw,38px); line-height: 1.45; letter-spacing: -.04em; font-weight: 700; }
-.auth-screen .login-intro p { font-size: 13px; line-height: 1.7; color: #94a1ae; margin: 0; }
 .auth-screen .login-card { padding: 24px 20px; border: 1px solid rgba(255,255,255,.13); border-radius: 22px; background: #1b2129; }
 .auth-screen .login-lock { color: #78dcc0; display: inline-flex; padding: 10px; background: rgba(120,220,192,.08); border-radius: 14px; }
 .auth-screen .login-card h2 { font-size: 21px; margin: 18px 0 8px; letter-spacing: -.02em; font-weight: 700; }
 .auth-screen .login-card .muted { font-size: 12px; line-height: 1.7; margin: 0 0 24px; color: #94a1ae; }
-.auth-screen .login-form { margin: 0; padding: 0; border: 0; background: transparent; }
-.auth-screen .login-form label { display: block; font-size: 12px; font-weight: 400; color: #b0bbc6; margin-bottom: 9px; }
-.auth-screen .password-field { position: relative; display: flex; align-items: center; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; background: #111820; margin-bottom: 16px; overflow: hidden; }
-.auth-screen .password-field:focus-within { border-color: #78dcc0; box-shadow: 0 0 0 3px rgba(120,220,192,.08); }
-.auth-screen .password-field input { min-width: 0; flex: 1; width: 100%; height: 52px; min-height: 44px; border: 0; border-radius: 0; padding: 12px; background: transparent; color: #f3f6f8; outline: none; font-size: 16px; }
-.auth-screen .password-field input:focus-visible { outline: none; }
-.auth-screen .password-toggle { position: static; flex-shrink: 0; width: auto; border: 0; background: transparent; color: #94a1ae; font-size: 12px; padding: 8px 12px; }
+.auth-screen .login-card h2 + .login-primary, .auth-screen .login-card h2 + [hidden] + .login-primary { margin-top: 20px; }
 .auth-screen .login-primary { width: 100%; min-height: 50px; padding: 12px 16px; font-size: 15px; display: flex; justify-content: center; align-items: center; gap: 10px; border: 1px solid #78dcc0; border-radius: 12px; background: #78dcc0; color: #10231e; font-weight: 600; }
 .auth-screen .login-primary:hover { background: #9be9d4; }
 .auth-screen .text-button { color: #b0bbc6; border: 0; background: transparent; padding: 8px 12px; font-size: 14px; cursor: pointer; width: 100%; margin-top: 8px; }
-.auth-screen .autofill-username { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .auth-screen .login-error { font-size: 12px; line-height: 1.7; padding: 12px; color: #f5ca75; border-radius: 10px; background: rgba(245,202,117,.07); margin: 16px 0 0; overflow-wrap: anywhere; }
-.auth-screen .privacy-note { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 10px; color: #94a1ae; line-height: 1.7; text-align: center; margin: 22px 0 0; }
-.auth-screen .login-disclosure { font-size: 10px; line-height: 1.7; text-align: center; color: #94a1ae; margin: 12px 0 0; }
 .auth-screen .login-local-tools { margin-top: 16px; }
 .auth-screen .login-local-tools a { display: block; min-height: 44px; padding: 12px; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; background: transparent; color: #78dcc0; font-size: 14px; text-align: center; text-decoration: none; }
