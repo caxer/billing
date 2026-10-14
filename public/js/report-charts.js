@@ -82,30 +82,35 @@ export class ReportCharts {
   }
 
   controls(id, annual = false) {
+    // 每條線怎麼算放在按鈕提示，不另寫說明。
+    const tips = {
+      average: annual ? '只算範圍內完整年度；沒有完整年度時採已入帳年度平均' : '只算有支出的已入帳月份',
+      cumulative: '從顯示範圍起算，使用右軸',
+      extrema: '標出最高與最低',
+    };
     return `<div class="chart-tools">${[['average', annual ? '年均線' : '月均線'], ['cumulative', '累積線'], ['extrema', '極值']].map(([key, name]) =>
-      `<button type="button" id="${id}-option-${key}" class="chip chart-toggle ${this.options[id][key] ? 'is-on' : ''}" data-chart-id="${id}" data-chart-option="${key}" aria-pressed="${this.options[id][key]}">${name}</button>`).join('')}</div>`;
+      `<button type="button" id="${id}-option-${key}" class="chip chart-toggle ${this.options[id][key] ? 'is-on' : ''}" data-chart-id="${id}" data-chart-option="${key}" aria-pressed="${this.options[id][key]}" title="${tips[key]}">${name}</button>`).join('')}</div>`;
   }
 
   legend(id) {
-    return `<div class="chart-legend" role="group" aria-label="顯示分類">${STACK_GROUPS.map((g) => `<button type="button" id="${id}-group-${g.key}" class="chart-legend-button ${this.hidden[id].has(g.key) ? 'is-hidden' : ''}" data-chart-id="${id}" data-chart-group="${g.key}" aria-pressed="${!this.hidden[id].has(g.key)}"><i class="dot" style="background:${g.color}"></i>${g.name}</button>`).join('')}</div>`;
+    return `<div class="chart-legend" role="group" aria-label="顯示分類" title="點分類隱藏或顯示，不影響報表合計">${STACK_GROUPS.map((g) => `<button type="button" id="${id}-group-${g.key}" class="chart-legend-button ${this.hidden[id].has(g.key) ? 'is-hidden' : ''}" data-chart-id="${id}" data-chart-group="${g.key}" aria-pressed="${!this.hidden[id].has(g.key)}"><i class="dot" style="background:${g.color}"></i>${g.name}</button>`).join('')}</div>`;
   }
 
   rangeControls(points, selected, id) {
-    return `<div class="chart-range"><label class="field"><span class="field-label">範圍起始</span><select id="${id}-range-start" data-chart-id="${id}" data-chart-range="start">${points.map((p, i) => `<option value="${esc(p.key)}"${i === selected.start ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label>
-      <label class="field"><span class="field-label">範圍結束</span><select id="${id}-range-end" data-chart-id="${id}" data-chart-range="end">${points.map((p, i) => `<option value="${esc(p.key)}"${i === selected.end ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label><button type="button" id="${id}-range-reset" class="btn-quiet" data-range-reset="${id}">重設範圍</button></div>`;
+    return `<div class="chart-range"><select id="${id}-range-start" aria-label="範圍起始" data-chart-id="${id}" data-chart-range="start">${points.map((p, i) => `<option value="${esc(p.key)}"${i === selected.start ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select><span aria-hidden="true">–</span>
+      <select id="${id}-range-end" aria-label="範圍結束" data-chart-id="${id}" data-chart-range="end">${points.map((p, i) => `<option value="${esc(p.key)}"${i === selected.end ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select><button type="button" id="${id}-range-reset" class="btn-quiet" data-range-reset="${id}" aria-label="重設範圍" title="重設範圍">重設</button></div>`;
   }
 
   plot(id, points, annual) {
     const groups = STACK_GROUPS.filter((g) => !this.hidden[id].has(g.key));
     const model = stackedChart(points, groups, { ...this.options[id], annual, id });
     this.models.set(id, { ...model, points });
-    return `${this.legend(id)}${model.html}<div class="chart-tooltip" id="${id}-tooltip" role="status">點選或停留在柱上查看各分類金額。</div>
-      <p class="setting-hint">${annual ? `年均 ${model.stats.average === null ? '—' : money(model.stats.average)}：${model.stats.completeAverage ? '只計算範圍內完整年度' : '範圍內沒有完整年度，採已入帳年度平均'}` : `月均 ${model.stats.average === null ? '—' : money(model.stats.average)}：沿用 billing，只計算有支出的已入帳月份`}。圖表隱藏分類不改動報表合計；累積線從顯示範圍起算，使用右軸。</p>`;
+    return `${this.legend(id)}${model.html}<div class="chart-tooltip" id="${id}-tooltip" role="status" title="點柱子看各分類金額">${annual ? '年均' : '月均'} ${model.stats.average === null ? '—' : money(model.stats.average)}</div>`;
   }
 
   monthly(year) {
     const points = this.monthPoints(year), selected = this.range(points, 'monthly');
-    return `<div class="card chart-card"><div class="section-head"><div><h3 class="section-title">${year} 支出走勢</h3><p class="setting-hint">分類堆疊 · 平均與累積花費</p></div>${this.controls('monthly')}</div>
+    return `<div class="card chart-card"><div class="section-head"><h3 class="section-title">${year} 支出走勢</h3>${this.controls('monthly')}</div>
       ${this.plot('monthly', selected.visible, false)}${this.rangeControls(points, selected, 'monthly')}</div>`;
   }
 
@@ -145,8 +150,8 @@ export class ReportCharts {
       this.models.set('growth', { ...model, points: selected.visible });
       const filtered = options.filter((o) => o.name.toLocaleLowerCase().includes(this.search.toLocaleLowerCase()));
       picker = `<details class="item-picker" id="growth-item-picker"><summary id="growth-item-summary">選擇細項（${chosen.length}）</summary><input id="growth-item-search" type="search" placeholder="搜尋細項" aria-label="搜尋趨勢細項" value="${esc(this.search)}"/><div class="chart-tools"><button type="button" id="growth-items-all" class="btn-quiet" data-items-action="all">全選</button><button type="button" id="growth-items-clear" class="btn-quiet" data-items-action="clear">清除</button></div><div class="item-choices">${filtered.map((o) => `<label><input type="checkbox" id="growth-item-${options.indexOf(o)}" data-chart-item value="${esc(o.key)}"${this.selectedItems.has(o.key) ? ' checked' : ''}/><span>${esc(o.name)}</span></label>`).join('')}</div></details>`;
-      drawing = `<div class="chart-legend">${series.map((s) => `<span><i class="dot" style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>${model.html}<div class="chart-tooltip" id="growth-tooltip" role="status">點選月份查看所選細項。</div><p class="setting-hint">月均線依顯示範圍內正金額月份計算；缺少細項粒度或待補月份會斷線。累積線從範圍起點重新計算；餘額只顯示每月期末值，不另加累積線。</p>`;
+      drawing = `<div class="chart-legend">${series.map((s) => `<span><i class="dot" style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>${model.html}<div class="chart-tooltip" id="growth-tooltip" role="status" title="點月份看所選細項；缺細項或待補月份會斷線，餘額只顯示期末值"></div>`;
     }
-    return `<div class="card chart-card"><div class="section-head"><div><h3 class="section-title">費用增長趨勢分析</h3><p class="setting-hint">${annual ? '各年度分類堆疊 · 完整年度平均' : '跨年度、按月份比較多個細項'}</p></div>${this.controls('growth', annual)}</div>${modeButtons}${picker}${drawing}${this.rangeControls(points, selected, 'growth')}</div>`;
+    return `<div class="card chart-card"><div class="section-head"><h3 class="section-title">費用增長趨勢</h3>${this.controls('growth', annual)}</div>${modeButtons}${picker}${drawing}${this.rangeControls(points, selected, 'growth')}</div>`;
   }
 }

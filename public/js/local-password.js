@@ -7,7 +7,9 @@ export function initLocalPassword(root) {
     if (!form()) return;
     const busy = sending || status.state === 'running';
     for (const input of form().querySelectorAll('input, button')) input.disabled = busy;
-    root.querySelector('#local-password-status').textContent = status.message || '修改後會自動發布，待頁面確認線上生效。';
+    root.querySelector('#local-password-status').textContent = status.message || '';
+    // 密碼卡平常收合；發布中或需要重試時自動展開。
+    if (busy || (status.state === 'failed' && status.saved)) root.querySelector('#local-password-card').open = true;
     root.querySelector('#local-password-retry').hidden = !(status.state === 'failed' && status.saved);
     root.querySelector('#local-password-retry').disabled = busy;
     form().hidden = status.state === 'failed' && status.saved;

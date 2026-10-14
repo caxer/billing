@@ -185,10 +185,10 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 12px;
 }
 
-.stack { display: grid; gap: 12px; }
+.stack { display: grid; gap: 10px; }
 
 /* ---------- 分頁列 ---------- */
 
@@ -219,9 +219,9 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 
 /* ---------- 數字卡 ---------- */
 
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 
-.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
 .tile-label { font-size: 12px; color: var(--muted); }
 .tile-value { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
 .tile-value.is-expense { color: var(--expense); }
@@ -241,11 +241,13 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .bar-fill.is-over { background: var(--danger); }
 .budget-note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
 .budget-note.is-over { color: var(--danger); }
-.budget-row + .budget-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.budget-row + .budget-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.budget-input { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 8px; }
+.budget-who { font-size: 14px; overflow-wrap: anywhere; }
 
 /* ---------- 列表 ---------- */
 
-.list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 
 .row {
   display: flex;
@@ -254,7 +256,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 10px 12px;
+  padding: 8px 12px;
   width: 100%;
   color: var(--text);
   text-align: left;
@@ -263,13 +265,13 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 
 .row-main { flex: 1; min-width: 0; }
 .row-title { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row-meta { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.row-meta { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; overflow-wrap: anywhere; }
 .row-amount { font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
 .row-amount.is-expense { color: var(--expense); }
 .row-amount.is-income { color: var(--income); }
 
 .section-title { font-size: 14px; color: var(--muted); margin: 4px 2px 0; font-weight: 600; }
-.empty { color: var(--muted); font-size: 14px; text-align: center; padding: 28px 12px; }
+.empty { color: var(--muted); font-size: 14px; text-align: center; padding: 16px 12px; margin: 0; }
 
 /* ---------- 圖表 ---------- */
 
@@ -292,11 +294,11 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .bars-seg { min-height: 1px; }
 /* 今天用整欄底色標記，不再改堆疊色塊的顏色，否則會蓋掉人的配色。 */
 .bars-col.is-today { background: color-mix(in srgb, var(--warn) 16%, transparent); border-radius: 2px; }
-.chart-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
 
-.cat { display: grid; grid-template-columns: 1fr auto auto; gap: 5px 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line); }
+.cat { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); }
 .cat:first-child { border-top: 0; }
 .cat-name { font-size: 14px; }
 .cat-pct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -306,13 +308,13 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 
 /* ---------- 表單 ---------- */
 
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
 .seg-btn {
   color: var(--muted);
 }
 .seg-btn.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
-.add-form { display: grid; gap: 14px; }
+.add-form { display: grid; gap: 12px; }
 
 .amount-row { display: flex; align-items: center; gap: 8px; }
 .amount-sign { font-size: 28px; color: var(--expense); font-weight: 700; }
@@ -351,8 +353,8 @@ input[type="text"], input[type="search"], input[type="password"], input[type="da
 select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: right 16px center, right 11px center; background-size: 5px 5px; background-repeat: no-repeat; }
 
 .date-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
-.date-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
-.date-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; }
+.date-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+.date-shortcuts { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; min-width: 0; }
 /* 日期欄位做成跟「今天／昨天」一樣的按鈕外觀：可見的是一個文字層，
    真正的 input 透明蓋在上面，所以點任何位置都會開原生日曆，
    同時 input 不再參與 grid 軌道計算，Safari 的尺寸 bug 也就不會發生。 */
@@ -387,17 +389,21 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   justify-content: space-between;
   gap: 12px;
   min-height: var(--tap);
-  padding: 8px 0;
+  padding: 4px 0;
   border-top: 1px solid var(--line);
 }
 .setting-row:first-child { border-top: 0; }
 .setting-name { font-size: 15px; }
 .setting-hint { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
 
-.tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { display: inline-flex; align-items: center; gap: 2px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
 .tag button { border: 0; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; padding: 0 2px; }
-.tag .tag-edit { padding: 2px 4px; border-radius: 6px; font-size: 14px; color: var(--text); }
+.tag .tag-edit { padding: 2px 4px; border-radius: 6px; font-size: 13px; color: var(--text); }
+.add-cat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; margin-top: 8px; }
+.add-cat-row select { width: auto; max-width: 112px; }
+.setting-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+#view-settings summary { cursor: pointer; min-height: 28px; }
 .tag .tag-edit:hover { background: var(--accent-soft); }
 
 .toast {
@@ -417,8 +423,6 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 @media (min-width: 600px) {
   main { padding: 18px 20px calc(84px + var(--safe-b)); }
   .tile-value { font-size: 22px; }
-  .date-controls { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
-  .date-shortcuts { grid-template-columns: repeat(2, auto); }
 }
 
 button { font: inherit; cursor: pointer; touch-action: manipulation; }
@@ -433,11 +437,9 @@ input:focus-visible, select:focus-visible { outline-offset: 1px; }
 select { padding-right: 34px; }
 .view { min-width: 0; }
 .card, .tile { box-shadow: 0 3px 12px #00000004; }
-.welcome { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0 6px; }
-.welcome h2 { font-size: clamp(17px, 4.6vw, 24px); letter-spacing: -.5px; }
-.welcome .btn-primary { white-space: nowrap; }
-.eyebrow { margin: 0 0 5px; font-size: 12px; color: var(--accent); font-weight: 650; letter-spacing: 2px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0 10px; }
+.today-card { display: flex; align-items: center; gap: 12px; padding-top: 8px; padding-bottom: 8px; }
+.today-card .btn-primary { margin-left: auto; white-space: nowrap; }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 2px 0 8px; }
 .text-button { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .row-arrow { color: var(--muted); font-size: 22px; }
 .row:hover { border-color: var(--accent); background: color-mix(in srgb, var(--surface) 94%, var(--accent)); }
@@ -445,23 +447,22 @@ select { padding-right: 34px; }
 .tab svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tab.is-on { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); }
 .chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted); }
-.record-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.record-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .search-field { grid-column: 1 / -1; }
-.results-summary { margin: 12px 2px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.form-context { color: var(--muted); font-size: 14px; margin: 2px 0 18px; }
+.results-summary { margin: 8px 2px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 #view-add { max-width: 620px; margin: auto; }
 #add-cancel-row { grid-template-columns: 1fr 1fr; }
 #add-cancel-row:has(button[hidden]):not(:has(button:not([hidden]))) { display: none; }
 .danger-button { color: var(--danger); }
 .tile-value { font-size: clamp(15px, 4.4vw, 22px); overflow-wrap: anywhere; }
-.tag { max-width: 100%; overflow-wrap: anywhere; padding: 0 8px 0 12px; }
-.tag button { min-width: 36px; min-height: 44px; }
+.tag { max-width: 100%; overflow-wrap: anywhere; padding: 0 4px 0 10px; }
+.tag button { min-width: 30px; min-height: 34px; }
 .budget-head { flex-wrap: wrap; }
 @media (min-width: 760px) {
   .topbar { padding: 18px 28px 12px; }
   main { padding: 24px 28px 100px; }
   .dashboard-grid, .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
-  .welcome, .tiles, .records-section { grid-column: 1 / -1; }
+  .tiles, .today-card, .records-section { grid-column: 1 / -1; }
   .tile { padding: 20px; }
   .tile-value { font-size: 30px; margin-top: 6px; }
   .card { padding: 20px; }
@@ -474,7 +475,6 @@ select { padding-right: 34px; }
   main { padding-left: 12px; padding-right: 12px; }
   .tiles { gap: 6px; }
   .tile { padding: 10px 8px; }
-  .welcome { flex-wrap: wrap; }
   .row { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -483,13 +483,14 @@ select { padding-right: 34px; }
 
 /* 月結沿用帳本的色彩與卡片；寬表只在自己的容器內捲動。 */
 .billing-month-card { grid-column: 1 / -1; }
-.billing-mini-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 12px 0; }
-.billing-mini-grid strong { display: block; font-size: 24px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.billing-parts { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.billing-mini-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
+.billing-mini-grid .setting-hint { display: block; font-size: 11px; line-height: 1.3; }
+.billing-mini-grid strong { display: block; font-size: clamp(15px, 4.2vw, 24px); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.billing-parts { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 0 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .billing-parts b { color: var(--text); margin-left: 5px; }
 .billing-layout { min-width: 0; }
 .billing-layout > *, #billing-content > * { min-width: 0; }
-.report-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.report-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .report-controls .seg { grid-column: 1 / -1; margin: 0; }
 .report-controls .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .report-controls .seg-btn { padding: 10px 6px; font-size: 13px; white-space: nowrap; }
@@ -497,18 +498,21 @@ select { padding-right: 34px; }
 .report-status { margin: 0 2px; font-size: 12px; color: var(--muted); }
 .report-notice { padding: 12px 16px; margin: 0; border-radius: var(--button-radius); background: var(--accent-soft); color: var(--text); font-size: 13px; }
 ul.report-notice { padding-left: 32px; }
-.billing-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.billing-tiles .tile-value { font-size: clamp(22px, 5vw, 30px); }
-.report-table-wrap { overflow: auto; max-width: 100%; margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; }
+.billing-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.billing-tiles .tile { padding: 8px; }
+.billing-tiles .tile-label { font-size: 11px; line-height: 1.3; }
+.billing-tiles .tile-value { font-size: clamp(14px, 4.2vw, 30px); }
+.tile-period { grid-column: 1 / -1; margin: 0 2px; font-size: 12px; color: var(--muted); }
+.report-table-wrap { overflow: auto; max-width: 100%; margin: 8px 0 0; border: 1px solid var(--line); border-radius: 10px; }
 .report-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
-.report-table th, .report-table td { white-space: nowrap; padding: 12px 14px; text-align: right; border-bottom: 1px solid var(--line); }
+.report-table th, .report-table td { white-space: nowrap; padding: 4px 8px; text-align: right; border-bottom: 1px solid var(--line); }
 .report-table thead th { background: var(--bg); font-size: 12px; color: var(--muted); }
 .report-table th:first-child { position: sticky; left: 0; text-align: left; background: var(--surface); border-right: 1px solid var(--line); z-index: 1; }
-.report-table small { display: block; color: var(--muted); font-size: 10px; font-weight: 400; margin-top: 4px; }
+.report-table small { display: block; color: var(--muted); font-size: 10px; font-weight: 400; margin-top: 2px; }
 .report-table tr:last-child > * { border-bottom: 0; }
 .report-total > * { font-weight: 700; background: var(--accent-soft) !important; }
 .future-month td { color: var(--muted); }
-.report-table .text-button { min-height: 36px; padding: 5px 10px; }
+.report-table .text-button { min-height: 28px; padding: 2px 8px; }
 .billing-layout summary { cursor: pointer; font-weight: 600; min-height: 44px; display: list-item; padding: 8px 0; }
 @media (min-width: 760px) {
   .billing-mini-grid, .billing-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -517,17 +521,17 @@ ul.report-notice { padding-left: 32px; }
   .tabs { max-width: 640px; }
 }
 
-.report-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.report-kpis .card { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.report-kpis strong { font-size: 22px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.report-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.report-kpis .card { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px; }
+.report-kpis strong { font-size: clamp(15px, 4.2vw, 22px); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .chart-card { min-width: 0; }
 .chart-card .section-head { flex-wrap: wrap; align-items: start; }
 .chart-tools { display: flex; flex-wrap: wrap; gap: 6px; }
 .chart-toggle { font-size: 12px; padding: 8px 11px; }
 .chart-toggle.is-on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0; font-size: 12px; }
+.chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 8px 0; font-size: 12px; }
 .chart-legend span { display: inline-flex; gap: 5px; align-items: center; }
-.chart-legend-button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 12px; padding: 7px 9px; min-height: 36px; }
+.chart-legend-button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 12px; padding: 4px 8px; min-height: 32px; }
 .chart-legend-button.is-hidden { opacity: .4; text-decoration: line-through; }
 .chart-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 .billing-chart-svg { width: 100%; height: auto; display: block; }
@@ -542,13 +546,12 @@ ul.report-notice { padding-left: 32px; }
 .chart-line-label, .chart-extreme { font-size: 12px; font-weight: 600; fill: var(--text); stroke: var(--surface); stroke-width: 3; paint-order: stroke; }
 .chart-point { cursor: pointer; }
 .chart-point:hover rect, .chart-point:focus rect { fill: var(--accent); fill-opacity: .08; }
-.chart-tooltip { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 16px; min-height: 48px; padding: 12px; margin: 8px 0; border-radius: 10px; background: var(--bg); color: var(--muted); font-size: 12px; }
+.chart-tooltip { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 36px; padding: 8px 12px; margin: 6px 0; border-radius: 10px; background: var(--bg); color: var(--muted); font-size: 12px; }
+.chart-tooltip:empty { display: none; }
 .chart-tooltip span { display: inline-flex; align-items: center; gap: 5px; }
 .chart-tooltip strong, .chart-tooltip b { color: var(--text); }
-.chart-range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 14px; align-items: end; }
-.chart-range .field { margin: 0; }
-.chart-range button { grid-column: 1 / -1; }
-.chart-modes { margin: 10px 0; }
+.chart-range { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: 6px; margin-top: 8px; align-items: center; color: var(--muted); }
+.chart-modes { margin: 8px 0; }
 .item-picker { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 12px 0; }
 .item-picker input[type="search"] { margin: 8px 0; }
 .item-choices { display: grid; gap: 6px; max-height: 270px; overflow-y: auto; margin: 10px 0; }
@@ -559,7 +562,10 @@ ul.report-notice { padding-left: 32px; }
 .report-table small.yoy-delta.is-expense { color: var(--expense); }
 @media (min-width: 760px) {
   .report-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .chart-range { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
-  .chart-range button { grid-column: auto; }
   .item-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 窄螢幕四個數字放不下，改回兩欄；要放在月結樣式之後才蓋得過。 */
+@media (max-width: 360px) {
+  .billing-mini-grid, .billing-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

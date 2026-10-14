@@ -30,7 +30,6 @@ function budgetRow({ person, index, spent, limit }) {
     return `<div class="budget-row">
       <div class="budget-head"><span class="budget-title">${label}</span>
         <span class="budget-num">已花 ${calc.money(spent)} 元</span></div>
-      <p class="budget-note">還沒設定這個人的額度</p>
     </div>`;
   }
   const used = Math.round((spent / limit) * 100);
@@ -58,12 +57,9 @@ function budgetCard(items, month, people) {
     spent: calc.summarize(items.filter((it) => it.by === person)).expense,
     limit: budgetFor(person, month),
   }));
-  if (!rows.some((row) => row.limit)) {
-    return `<div class="card"><div class="budget-title">本月額度</div>
-      <p class="budget-note">還沒設定每月支出上限，去「設定」填一個就能看進度。</p></div>`;
-  }
+  if (!rows.some((row) => row.limit)) return '';
   return `<div class="card">
-    <div class="budget-head"><span class="budget-title">本月支出額度</span></div>
+    <div class="budget-head"><span class="budget-title">本月額度</span></div>
     ${rows.map(budgetRow).join('')}
   </div>`;
 }
@@ -92,11 +88,10 @@ const recordList = (items, limit) => {
 
 function billingCard(items) {
   const summary = transactionSummary(items, allSettings()?.billingGroups);
-  return `<div class="card billing-month-card"><div class="section-head"><h2 class="section-title">本月自動月結</h2><button class="text-button" type="button" data-go="billing">年度月表 →</button></div>
-    <div class="billing-mini-grid">${[['月消費總額', summary.monthlyTotal], ['扣除列項後開銷', summary.daily], ['水電氣', summary.utilities], ['家庭總支出', summary.total]].map(([name, total]) =>
-      `<div><span class="setting-hint">${name}</span><strong>${calc.money(total)}</strong></div>`).join('')}</div>
-    <div class="billing-parts">${[['房', summary.house], ['女兒', summary.daughter], ['兒子', summary.son]].map(([name, total]) => `<span>${name} <b>${calc.money(total)}</b></span>`).join('')}</div>
-    <p class="setting-hint">依本月記帳交易計算。月消費含房與子女；水電氣另計。歷史月結請看年度月表。</p></div>`;
+  return `<div class="card billing-month-card"><div class="section-head"><h2 class="section-title">本月月結</h2><button class="text-button" type="button" data-go="billing">年度 →</button></div>
+    <div class="billing-mini-grid">${[['月消費總額', summary.monthlyTotal, '含房與子女'], ['扣除列項後開銷', summary.daily, '日常'], ['水電氣', summary.utilities, '另計'], ['家庭總支出', summary.total, '月消費總額＋水電氣']].map(([name, total, tip]) =>
+      `<div title="${tip}"><span class="setting-hint">${name}</span><strong>${calc.money(total)}</strong></div>`).join('')}</div>
+    <div class="billing-parts">${[['房', summary.house], ['女兒', summary.daughter], ['兒子', summary.son]].map(([name, total]) => `<span>${name} <b>${calc.money(total)}</b></span>`).join('')}</div></div>`;
 }
 
 export function dashboard(month, items, prevItems, people) {
@@ -107,23 +102,20 @@ export function dashboard(month, items, prevItems, people) {
 
   return `
     <div class="stack dashboard-grid">
-      <div class="welcome"><div><p class="eyebrow">帳本紀錄</p><h2>一起掌握每一筆日常</h2><p class="setting-hint">${calc.monthLabel(month)} · ${items.length} 筆紀錄</p></div><button type="button" class="btn-primary" data-go="add">＋ 記一筆</button></div>
       <div class="tiles">
         ${tile('本月支出', calc.money(expense), 'is-expense', changeSub(expense, previous.expense))}
         ${tile('本月收入', calc.money(income), 'is-income', changeSub(income, previous.income))}
         ${tile('淨額', calc.signedMoney(net), net < 0 ? 'is-expense' : 'is-income')}
       </div>
+      <div class="card today-card">
+        <span class="setting-name">今日支出</span>
+        <span class="row-amount is-expense">${calc.money(todayExpense)}</span>
+        <button type="button" class="btn-primary" data-go="add">＋ 記一筆</button>
+      </div>
       ${billingCard(items)}
       ${budgetCard(items, month, people)}
-      <div class="card">
-        <div class="setting-row">
-          <span class="setting-name">今日支出</span>
-          <span class="row-amount is-expense">${calc.money(todayExpense)}</span>
-        </div>
-      </div>
-      <div class="records-section"><div class="section-head"><h2 class="section-title">最近紀錄</h2><button type="button" class="text-button" data-go="stats">查看全部 →</button></div>
-      ${recordList(items, 5)}
-      ${!items.length ? '<button type="button" class="btn-quiet btn-block" data-go="add">記下第一筆</button>' : ''}</div>
+      <div class="records-section"><div class="section-head"><h2 class="section-title">最近紀錄</h2><button type="button" class="text-button" data-go="stats">全部 →</button></div>
+      ${recordList(items, 5)}</div>
     </div>`;
 }
 
@@ -153,7 +145,8 @@ export function stats(month, items, prevItems, categoryType, filters = {}, peopl
         .map((person, index) => stackSeg(d, person, index, d.total))
         .join('');
       const tip = recordPeople.map((p) => `${esc(p || '未指定')} ${calc.money(d.parts.get(p) || 0)}`).join(' · ');
-      return `<div class="bars-col ${d.day === todayDay && isThisMonth ? 'is-today' : ''}" title="${d.date}：${tip || '0 元'}"><div class="bars-stack" style="height:${Math.round((d.total / maxDay) * 100)}%">${segs}</div></div>`;
+      const isToday = d.day === todayDay && isThisMonth;
+      return `<div class="bars-col ${isToday ? 'is-today' : ''}" title="${isToday ? '今天 ' : ''}${d.date}：${tip || '0 元'}"><div class="bars-stack" style="height:${Math.round((d.total / maxDay) * 100)}%">${segs}</div></div>`;
     })
     .join('');
   const legend = recordPeople.map((p, i) => `<span class="legend-item"><i class="dot" style="background:${personColor(i)}" aria-hidden="true"></i>${esc(p || '未指定')}</span>`).join('');
@@ -168,8 +161,6 @@ export function stats(month, items, prevItems, categoryType, filters = {}, peopl
         ${tile('收入', calc.money(income), 'is-income')}
         ${tile('淨額', calc.signedMoney(net), net < 0 ? 'is-expense' : 'is-income')}
       </div>
-
-      ${billingCard(items)}
 
       <div class="card">
         <div class="budget-head"><span class="budget-title">每日支出</span>
@@ -202,11 +193,11 @@ export function stats(month, items, prevItems, categoryType, filters = {}, peopl
       </div>
 
       <div class="records-section">
-        <div class="section-head"><h2 class="section-title">全部紀錄</h2><button type="button" id="record-clear" class="text-button">清除篩選</button></div>
-        <div class="record-filters card">
-          <label class="field search-field"><span class="field-label">搜尋紀錄</span><input id="record-query" type="search" data-filter="query" placeholder="內容、分類、日期或金額" value="${esc(filters.query || '')}" autocomplete="off"/></label>
-          <label class="field"><span class="field-label">收支</span><select data-filter="type"><option value="">全部收支</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select></label>
-          <label class="field"><span class="field-label">記帳人</span><select data-filter="by"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select></label>
+        <div class="section-head"><h2 class="section-title">全部紀錄</h2><button type="button" id="record-clear" class="text-button">清除</button></div>
+        <div class="record-filters">
+          <input id="record-query" class="search-field" type="search" data-filter="query" aria-label="搜尋紀錄" placeholder="搜尋內容、分類、日期、金額" value="${esc(filters.query || '')}" autocomplete="off"/>
+          <select data-filter="type" aria-label="收支"><option value="">全部收支</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
+          <select data-filter="by" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
         </div>
         <div id="record-results">${records(items, filters)}</div>
       </div>
@@ -216,7 +207,7 @@ export function stats(month, items, prevItems, categoryType, filters = {}, peopl
 export function records(items, filters) {
   const found = calc.filterItems(items, filters);
   const totals = calc.summarize(found);
-  return `<p class="results-summary" role="status">找到 ${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found) : `<p class="empty">${items.length ? '找不到符合條件的紀錄，試試其他關鍵字或清除篩選。' : '這個月還沒有紀錄'}</p>`}`;
+  return `<p class="results-summary" role="status">${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found) : `<p class="empty">${items.length ? '沒有符合的紀錄' : '這個月還沒有紀錄'}</p>`}`;
 }
 
 /* ---------- 設定 ---------- */
@@ -232,17 +223,11 @@ export function settings(ctx) {
     <div class="stack">
       <div class="card">
         <div class="setting-row">
-          <div>
-            <div class="setting-name">這支手機是</div>
-            <p class="setting-hint">記帳時預設選這個人</p>
-          </div>
+          <div class="setting-name" title="記帳時預設選這個人">這支手機是</div>
           <select id="set-me" aria-label="這支手機的預設記帳人" style="max-width:150px">${people.map((p) => `<option ${p === me ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
         </div>
         <div class="setting-row">
-          <div>
-            <div class="setting-name">外觀</div>
-            <p class="setting-hint">跟著系統或手動指定</p>
-          </div>
+          <div class="setting-name">外觀</div>
           <select id="set-theme" aria-label="外觀" style="max-width:150px">
             <option value="auto" ${theme === 'auto' ? 'selected' : ''}>跟隨系統</option>
             <option value="light" ${theme === 'light' ? 'selected' : ''}>亮色</option>
@@ -257,48 +242,44 @@ export function settings(ctx) {
         ${people.map((person, index) => {
           const limit = budgetFor(person, month);
           return `
-          <p class="setting-hint" style="margin:12px 0 0">${personLabel(person, index)} · ${limit ? `${calc.money(limit)} 元` : '未設定'}</p>
-          <div class="date-row" style="margin-top:6px">
-            <input id="set-budget-${index}" type="number" inputmode="numeric" placeholder="例如 20000"
+          <div class="budget-input">
+            <span class="budget-who">${personLabel(person, index)}</span>
+            <input id="set-budget-${index}" type="number" inputmode="numeric" placeholder="${limit ? calc.money(limit) : '未設定'}" title="填 0 取消上限；沒設定的月份沿用預設"
                    value="${esc(budgets[person]?.[month] ?? '')}" aria-label="${esc(person)}本月支出額度" min="0" step="1"/>
             <button type="button" class="btn-quiet" data-budget-person="${esc(person)}" data-budget-index="${index}">套用</button>
           </div>`;
         }).join('')}
-        <p class="setting-hint">每個人分別計算。填 0 代表取消上限；沒單獨設定這個月的人會沿用自己的預設值。</p>
       </div>
 
       <div class="card">
         <div class="budget-title">記帳人</div>
         <div class="tag-list" id="people-list">${people.map((p, i) => `
           <span class="tag">
-            <button type="button" class="tag-edit" data-rename-person="${esc(p)}" aria-label="把 ${esc(p)} 改名">${esc(p)}</button>
+            <button type="button" class="tag-edit" data-rename-person="${esc(p)}" aria-label="把 ${esc(p)} 改名" title="點名字改名，本月紀錄一起改">${esc(p)}</button>
             <button type="button" data-del-person="${esc(p)}" aria-label="刪除 ${esc(p)}">×</button>
           </span>`).join('')}</div>
-        <p class="setting-hint">點名字可以改名，會連本月紀錄一起改。其他月份的紀錄仍是舊名字，不會跟著改。</p>
       </div>
 
       <div class="card">
-        <div class="budget-title">支出分類</div>
-        <div class="tag-list" id="cats-expense">${catTags(expenseCats, 'expense')}</div>
-        <div class="date-row" style="margin-top:10px">
+        <details id="cats-expense-card"><summary class="budget-title">支出分類 <span class="budget-num">${expenseCats.length}</span></summary>
+        <div class="tag-list" id="cats-expense">${catTags(expenseCats, 'expense')}</div></details>
+        <div class="add-cat-row">
           <input id="new-cat-expense" type="text" placeholder="新增支出分類" enterkeyhint="done"/>
+          <select id="new-cat-group" aria-label="歸在哪個大項" title="房、女兒、兒子從月消費總額分列；日常歸在扣除列項後開銷；水電氣另計">${GROUPS.map((g) => `<option>${g}</option>`).join('')}</select>
           <button type="button" class="btn-quiet" data-add-cat="expense">新增</button>
         </div>
-        <label class="field" style="margin-top:10px"><span class="field-label">新分類歸在哪個大項？</span><select id="new-cat-group">${GROUPS.map((g) => `<option>${g}</option>`).join('')}</select></label>
-        <p class="setting-hint">房、女兒、兒子會從月消費總額分列；日常歸在扣除列項後開銷，水電氣另計。</p>
       </div>
 
       <div class="card">
-        <div class="budget-title">收入分類</div>
-        <div class="tag-list" id="cats-income">${catTags(incomeCats, 'income')}</div>
-        <div class="date-row" style="margin-top:10px">
+        <details id="cats-income-card"><summary class="budget-title">收入分類 <span class="budget-num">${incomeCats.length}</span></summary>
+        <div class="tag-list" id="cats-income">${catTags(incomeCats, 'income')}</div></details>
+        <div class="date-row" style="margin-top:8px">
           <input id="new-cat-income" type="text" placeholder="新增收入分類" enterkeyhint="done"/>
           <button type="button" class="btn-quiet" data-add-cat="income">新增</button>
         </div>
       </div>
 
-      ${isLocal ? `<div class="card"><h2 class="section-title">修改網站密碼</h2>
-        <p class="setting-hint">驗證舊密碼後自動發布。帳本資料與既有 Face ID 保留。</p>
+      ${isLocal ? `<details class="card" id="local-password-card"><summary class="budget-title" title="驗證舊密碼後自動發布；帳本資料與 Face ID 保留">修改網站密碼</summary>
         <form id="local-password-form" class="stack" style="margin-top:12px">
           <label class="field"><span class="field-label">舊密碼</span><input name="oldPassword" type="password" autocomplete="current-password" required maxlength="1024"></label>
           <label class="field"><span class="field-label">新密碼</span><input name="newPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="1024" placeholder="至少 12 個字"></label>
@@ -307,23 +288,16 @@ export function settings(ctx) {
         </form>
         <p id="local-password-status" class="setting-hint" role="status" aria-live="polite"></p>
         <button id="local-password-retry" type="button" class="btn-quiet btn-block" hidden>重試發布新密碼</button>
+      </details>` : ''}
+
+      ${!isLocal ? `<div class="card">
+        ${biometric.enabled && !biometric.pending ? '<button type="button" class="btn-quiet btn-block" id="set-biometric-disable" title="停用後恢復記住登入；通行密鑰可在系統密碼設定刪除">停用 Face ID</button>' : `<button type="button" class="btn-quiet btn-block" id="set-biometric-enable" title="${biometric.available ? '每台裝置各自啟用，帳本密碼仍可備援' : '此裝置沒有可用的生物辨識'}"${biometric.available ? '' : ' disabled data-unavailable'}>${biometric.pending ? '完成 Face ID 設定' : biometric.available ? '啟用 Face ID／生物辨識' : '此裝置無法用 Face ID'}</button>`}
       </div>` : ''}
 
-      ${!isLocal ? `<div class="card"><h2 class="section-title">Face ID／生物辨識</h2>
-        <p class="setting-hint">${biometric.enabled ? '已啟用。重新開啟帳本時，需要裝置驗證或帳本密碼。' : '啟用後用 Face ID、Touch ID 或裝置驗證解鎖；登入資訊會加密保存。'}</p>
-        ${biometric.enabled && !biometric.pending ? '<button type="button" class="btn-quiet btn-block" id="set-biometric-disable">停用生物辨識</button>' : `<button type="button" class="btn-quiet btn-block" id="set-biometric-enable"${biometric.available ? '' : ' disabled data-unavailable'}>${biometric.pending ? '完成 Face ID 設定' : '啟用 Face ID／生物辨識'}</button>`}
-        <p class="setting-hint">${biometric.enabled ? '停用後恢復記住登入。通行密鑰可另外在系統密碼設定中刪除。' : biometric.available ? '建立通行密鑰時可能需要兩次確認。每台裝置需各自啟用，帳本密碼仍可備援。' : '此裝置或瀏覽器沒有可用的生物辨識。可繼續使用帳本密碼。'}</p>
-      </div>` : ''}
-
-      <div class="card">
-        <button type="button" class="btn-quiet btn-block" data-go="billing">年度月結與跨年比較</button>
-        <p class="setting-hint">直接查看 billing 歷年分類、每月合計與備註。</p>
-        <button type="button" class="btn-quiet btn-block" id="set-export">匯出本月 CSV</button>
-        <p class="setting-hint" style="margin-top:8px">匯出 ${calc.monthLabel(month)}的全部紀錄，可用 Excel 開啟。</p>
-        <button type="button" class="btn-quiet btn-block danger-button" id="set-clear">清空本月紀錄</button>
-        <p class="setting-hint" style="margin-top:8px">刪掉 ${calc.monthLabel(month)}的全部紀錄，其他月份不受影響。清空後無法復原。</p>
-        ${!isLocal ? `<button type="button" class="btn-quiet btn-block" id="set-lock">鎖定帳本</button><p class="setting-hint" style="margin-top:8px">${biometric.enabled ? '下次需要生物辨識或帳本密碼解鎖。' : '清除這台裝置記住的登入，下次需重新輸入密碼。'}</p>` : ''}
-        ${isLocal ? '<p class="setting-hint">目前是本機預覽模式，資料在 local/data/，不會上傳。</p>' : ''}
+      <div class="setting-actions">
+        <button type="button" class="btn-quiet" id="set-export" title="匯出${calc.monthLabel(month)}全部紀錄，可用 Excel 開啟">匯出 CSV</button>
+        <button type="button" class="btn-quiet danger-button" id="set-clear" title="刪掉${calc.monthLabel(month)}全部紀錄，無法復原">清空本月</button>
+        ${!isLocal ? `<button type="button" class="btn-quiet" id="set-lock" title="${biometric.enabled ? '下次需要生物辨識或帳本密碼解鎖' : '清除這台裝置記住的登入'}">鎖定帳本</button>` : ''}
       </div>
     </div>`;
 }

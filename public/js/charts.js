@@ -13,7 +13,7 @@ function path(values, x, y) {
 }
 
 function coordinates(count, values, cumulative) {
-  const width = Math.max(680, count * 48 + 120), height = 340;
+  const width = Math.max(680, count * 48 + 120), height = 260;
   const left = 74, right = cumulative ? 88 : 24, top = 36, bottom = 57;
   const plotWidth = width - left - right, plotHeight = height - top - bottom;
   const known = values.filter(finite);

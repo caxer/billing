@@ -233,6 +233,8 @@ function renderSettings() {
     return;
   }
   const meValue = me || all.people[0];
+  // 重畫時保留使用者展開的區塊，刪完一個分類不會又收起來。
+  const opened = [...document.querySelectorAll('#view-settings details[open]')].map((el) => el.id);
   $('#view-settings').innerHTML = views.settings({
     people: all.people,
     expenseCats: all.expenseCategories,
@@ -244,6 +246,7 @@ function renderSettings() {
     isLocal: store.isLocal(),
     biometric: { available: biometricAvailable, enabled: store.biometricEnabled(), pending: store.biometricPending() },
   });
+  for (const id of opened) { const el = document.getElementById(id); if (el) el.open = true; }
   localPassword?.refresh();
 }
 
@@ -275,9 +278,10 @@ function fillCategories(type, selected) {
   updateCategoryHint();
 }
 
+/** 分類怎麼計入月結，放在選單的提示裡，不佔版面。 */
 function updateCategoryHint() {
   const group = classify($('#add-category').value, settings.all()?.billingGroups);
-  $('#add-category-hint').textContent = addType === 'income' ? '收入另行統計，不扣減月消費總額。' : group === '水電氣'
+  $('#add-category').title = addType === 'income' ? '收入另行統計，不扣減月消費總額。' : group === '水電氣'
     ? '土銀扣款，水電氣另計；會計入家庭總支出。' : group === '房'
       ? '公積金支付，會計入房屋分類及月消費總額。' : group === '日常'
         ? '會計入月消費總額及扣除列項後開銷。' : `會計入${group}分類及月消費總額。`;
