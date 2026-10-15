@@ -2,7 +2,7 @@
 // 私人 repo 的 settings.json 是真正來源；public/settings.json 只是首次寫入前的預設值。
 
 import * as store from './store.js';
-import { upgradeSettings, UTILITY_PAYER } from './billing.js';
+import { upgradeSettings, UTILITY_PAYER, monthlyBudget } from './billing.js';
 
 let current = null;
 let writes = Promise.resolve();
@@ -47,8 +47,7 @@ export function categories(type) {
 
 /** 某人某個月的支出上限；該月沒單獨設定就用這個人的 default。沒設定回傳 0。 */
 export function budgetFor(person, month) {
-  const per = current?.budgets?.[person];
-  return Number(per?.[month] ?? per?.default ?? 0);
+  return monthlyBudget(current, person, month);
 }
 
 /**

@@ -493,7 +493,7 @@ select { padding-right: 34px; }
 .billing-layout > *, #billing-content > * { min-width: 0; }
 .report-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .report-controls .seg { grid-column: 1 / -1; margin: 0; }
-.report-controls .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.report-controls .seg { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .report-controls .seg-btn { padding: 10px 6px; font-size: 13px; white-space: nowrap; }
 .report-controls .field { margin: 0; }
 .report-status { margin: 0 2px; font-size: 12px; color: var(--muted); }

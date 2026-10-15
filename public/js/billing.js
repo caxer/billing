@@ -19,6 +19,9 @@ export const UTILITY_PAYER = '土銀';
 /** 土銀某年的水電氣預算，存在 budgets.土銀.<年>；沒設定回傳 0。 */
 export const utilityBudget = (settings, year) =>
   Number(settings?.budgets?.[UTILITY_PAYER]?.[year] ?? settings?.budgets?.[UTILITY_PAYER]?.default ?? 0);
+/** 某人某月的支出額度，也是上繳公積金的額度；該月沒單獨設定就用 default。 */
+export const monthlyBudget = (settings, person, month) =>
+  Number(settings?.budgets?.[person]?.[month] ?? settings?.budgets?.[person]?.default ?? 0);
 export const BILLING_CATEGORIES = Object.entries(ITEMS).flatMap(([group, items]) => items.map((item) => `${group}／${item}`));
 export const validMonth = (value) => /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value || '');
 
@@ -176,11 +179,147 @@ export function annualReport(year, records, history, cutoff, mappings = {}, hist
   });
 }
 
-/** 年度已入帳的水電氣，對照土銀年度預算；待補與缺資料月份不計。 */
-export function utilityBudgetUsage(months, limit) {
-  const counted = months.filter((m) => ['history', 'transactions'].includes(m.source));
-  const spent = counted.reduce((sum, m) => sum + m.utilities, 0);
-  return { spent, limit, left: limit - spent, used: limit ? Math.round((spent / limit) * 100) : 0, skipped: months.length - counted.length };
+export const BANK_ITEMS = ['電費', '水費', '燃氣', '其他'];
+export const FUND_ITEMS = ['房', '女兒', '兒子', '日常'];
+/** 原表家用列的公、婆，依序對應記帳人名單前兩位（土銀除外）。 */
+export const FUND_SHARES = ['公', '婆'];
+
+/** 帳本從歷史第一年 1 月逐月走到 through；歷史截止後（含待補月份）改用交易。 */
+function* ledgerMonths({ history, cutoff, historyThrough, through }) {
+  const first = Object.keys(history || {}).sort()[0];
+  if (!first || !validMonth(through)) return;
+  for (let month = `${first}-01`; month <= through; month = shiftMonth(month, 1)) {
+    const fromHistory = validMonth(cutoff) && month < cutoff && !(validMonth(historyThrough) && month > historyThrough);
+    yield { month, fromHistory, rows: fromHistory ? history[month.slice(0, 4)] : null, index: Number(month.slice(5)) - 1 };
+  }
+}
+
+/**
+ * 土銀帳逐月明細，從歷史第一年 1 月到 through。
+ * 歷史月份取原表水電氣列；之後（含待補月份）取記在土銀名下的交易，水電氣以外的支出歸「其他」。
+ * 原表每年把上年結餘記成收入，這裡當對帳點：diff 是原表結餘減前期推算，之後以原表數字為準。
+ */
+export function bankLedger({ history = {}, cutoff, historyThrough, records = {}, mappings = {}, through }) {
+  const ledger = [];
+  let balance = 0, started = false;
+  for (const { month, fromHistory, rows, index } of ledgerMonths({ history, cutoff, historyThrough, through })) {
+    const entry = { month, source: fromHistory ? 'history' : 'transactions', opening: null, incomes: [], expenses: Object.fromEntries(BANK_ITEMS.map((k) => [k, 0])), diff: null };
+    if (fromHistory) {
+      if (!rows) {
+        ledger.push({ ...entry, source: 'missing', income: null, expense: null, balance: null });
+        balance = null;
+        continue;
+      }
+      for (const row of rows.filter((r) => r.category === '水電氣')) {
+        const amount = Number(row.months[index]);
+        if (!amount) continue;
+        const note = row.tooltips?.[index] || '';
+        if (row.item === '收入') {
+          if (/結餘|餘額/.test(note)) entry.opening = { amount, note };
+          else entry.incomes.push({ amount, note });
+        } else if (BANK_ITEMS.includes(row.item)) entry.expenses[row.item] += amount;
+      }
+    } else {
+      for (const it of records[month] || []) {
+        if (it.by !== UTILITY_PAYER) continue;
+        if (it.type === 'income') entry.incomes.push({ amount: it.amount, note: it.note || it.category });
+        if (it.type !== 'expense') continue;
+        const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
+        const item = group === '水電氣' ? it.category.split('／')[1] : null;
+        entry.expenses[BANK_ITEMS.includes(item) ? item : '其他'] += it.amount;
+      }
+    }
+    if (entry.opening) {
+      if (started && balance !== null) entry.diff = entry.opening.amount - balance;
+      balance = entry.opening.amount;
+    }
+    started ||= !!entry.opening;
+    entry.income = entry.incomes.reduce((s, i) => s + i.amount, 0);
+    entry.expense = BANK_ITEMS.reduce((s, k) => s + entry.expenses[k], 0);
+    if (balance !== null) balance += entry.income - entry.expense;
+    ledger.push({ ...entry, balance });
+  }
+  return ledger;
+}
+
+/**
+ * 公積金帳逐月明細：公婆每月額度與各自額外加入的收入，支付房、女兒、兒子與日常（即月消費總額）。
+ * 歷史月份取原表家用列與月結；之後取交易：額度用 quotaFor(記帳人, 月份)，額外是記在該人名下的收入，
+ * 支出是土銀以外的全部支出。原表年初的「結餘／上月超支」當對帳點；赤盈列另外核對
+ * 「公赤盈＋婆赤盈＝額度合計－月消費總額」，gap 為兩者差額。
+ */
+export function fundLedger({ history = {}, cutoff, historyThrough, records = {}, mappings = {}, through, members = [], quotaFor = () => 0 }) {
+  const ledger = [];
+  let balance = 0;
+  for (const { month, fromHistory, rows, index } of ledgerMonths({ history, cutoff, historyThrough, through })) {
+    const shares = FUND_SHARES.map((name, i) => ({ name, member: members[i] || null, quota: 0, extras: [], carry: null }));
+    const entry = { month, source: fromHistory ? 'history' : 'transactions', shares, expenses: null, settlement: null, diff: null };
+    if (fromHistory && !rows) {
+      ledger.push({ ...entry, source: 'missing', income: null, expense: null, balance: null });
+      balance = null;
+      continue;
+    }
+    if (fromHistory) {
+      for (const share of shares) {
+        rows.filter((r) => r.category === '家用' && r.item === share.name).forEach((row, n) => {
+          const amount = Number(row.months[index]);
+          const note = row.tooltips?.[index] || '';
+          // 每人第一列是每月額度，其餘是額外加入；結餘與上月超支是上一期結轉。
+          if (n === 0) share.quota = amount;
+          else if (!amount) return;
+          else if (/結餘|超支/.test(note)) share.carry = { amount: (share.carry?.amount || 0) + amount, note };
+          else share.extras.push({ amount, note });
+        });
+      }
+      const s = historySummary(rows, index);
+      entry.expenses = s.monthlyTotal === null ? null : { 房: s.house, 女兒: s.daughter, 兒子: s.son, 日常: s.daily };
+      const settled = FUND_SHARES.map((name) => rows.find((r) => r.category === '家用' && r.item === `${name}每月赤盈(年末結算)`));
+      if (settled.every(Boolean) && s.monthlyTotal !== null) {
+        const amounts = settled.map((r) => Number(r.months[index]));
+        const expected = shares.reduce((sum, sh) => sum + sh.quota, 0) - s.monthlyTotal;
+        entry.settlement = { amounts, expected, gap: amounts[0] + amounts[1] - expected };
+      }
+    } else {
+      const items = (records[month] || []).filter((it) => it.by !== UTILITY_PAYER);
+      for (const share of shares) {
+        if (!share.member) continue;
+        share.quota = quotaFor(share.member, month);
+        share.extras = items.filter((it) => it.type === 'income' && it.by === share.member).map((it) => ({ amount: it.amount, note: it.note || it.category }));
+      }
+      const t = transactionSummary(items, mappings);
+      // 自己付的水電氣不經土銀，跟日常一起由公積金支付。
+      entry.expenses = { 房: t.house, 女兒: t.daughter, 兒子: t.son, 日常: t.daily + t.utilities };
+    }
+    const carries = shares.filter((sh) => sh.carry);
+    if (carries.length) {
+      const amount = carries.reduce((sum, sh) => sum + sh.carry.amount, 0);
+      if (balance !== null) entry.diff = amount - balance;
+      balance = amount;
+    }
+    entry.income = shares.reduce((sum, sh) => sum + sh.quota + sh.extras.reduce((s, e) => s + e.amount, 0), 0);
+    entry.expense = entry.expenses && FUND_ITEMS.reduce((sum, k) => sum + entry.expenses[k], 0);
+    balance = balance === null || entry.expense === null ? null : balance + entry.income - entry.expense;
+    ledger.push({ ...entry, balance });
+  }
+  return ledger;
+}
+
+/** 公積金某年的合計。 */
+export function fundYear(ledger, year) {
+  const months = ledger.filter((m) => m.month.startsWith(`${year}-`));
+  const known = months.filter((m) => m.expense !== null);
+  const sum = (pick) => known.reduce((s, m) => s + pick(m), 0);
+  return { months, quota: sum((m) => m.shares.reduce((s, sh) => s + sh.quota, 0)),
+    extra: sum((m) => m.shares.reduce((s, sh) => s + sh.extras.reduce((t, e) => t + e.amount, 0), 0)),
+    expense: sum((m) => m.expense), balance: months.at(-1)?.balance ?? null, missing: months.length - known.length };
+}
+
+/** 土銀某年的合計；缺資料的月份另計，不當成零。 */
+export function bankYear(ledger, year) {
+  const months = ledger.filter((m) => m.month.startsWith(`${year}-`));
+  const known = months.filter((m) => m.source !== 'missing');
+  return { months, income: known.reduce((s, m) => s + m.income, 0), expense: known.reduce((s, m) => s + m.expense, 0),
+    balance: months.at(-1)?.balance ?? null, missing: months.length - known.length };
 }
 
 export function reportTotals(months) {
