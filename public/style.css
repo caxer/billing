@@ -456,6 +456,9 @@ select { padding-right: 34px; }
 .text-button { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .row-arrow { color: var(--muted); font-size: 22px; }
 .row:hover { border-color: var(--accent); background: color-mix(in srgb, var(--surface) 94%, var(--accent)); }
+/* 明細依記帳人上底色，顏色與每日支出圖一致。 */
+.row.has-who { background: color-mix(in srgb, var(--who) 13%, var(--surface)); border-left: 4px solid var(--who); }
+.row.has-who:hover { background: color-mix(in srgb, var(--who) 20%, var(--surface)); }
 .tab { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; font-size: 12px; }
 .tab svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tab.is-on { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); }

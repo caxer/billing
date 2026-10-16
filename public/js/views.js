@@ -64,11 +64,14 @@ function budgetCard(items, month, people) {
   </div>`;
 }
 
-function recordRow(it) {
+/** 明細的記帳人顏色與每日支出圖相同：名單順序在前，名單外的舊記帳人接在後面。 */
+const colorPeople = (items, people) => [...new Set([...people, ...items.map((it) => it.by || '')])];
+
+function recordRow(it, color) {
   const cls = it.type === 'income' ? 'is-income' : 'is-expense';
   const sign = it.type === 'income' ? '+' : '−';
   return `
-    <li><button type="button" class="row" data-id="${esc(it.id)}" aria-label="編輯 ${esc(it.date)} ${esc(it.note || it.category)} ${calc.money(it.amount)} 元">
+    <li><button type="button" class="row${color ? ' has-who' : ''}"${color ? ` style="--who:${color}"` : ''} data-id="${esc(it.id)}" aria-label="編輯 ${esc(it.date)} ${esc(it.note || it.category)} ${calc.money(it.amount)} 元">
       <span class="row-main">
         <span class="row-title">${esc(it.note || it.category || '未填內容')}</span>
         <span class="row-meta">${esc(it.date)} · ${esc(it.category)}${it.by ? ` · ${esc(it.by)}` : ''}</span>
@@ -78,7 +81,7 @@ function recordRow(it) {
     </button></li>`;
 }
 
-const recordList = (items) => `<ul class="list">${items.map(recordRow).join('')}</ul>`;
+const recordList = (items, colors) => `<ul class="list">${items.map((it) => recordRow(it, colors.get(it.by || ''))).join('')}</ul>`;
 
 /* ---------- 看板 ---------- */
 
@@ -116,7 +119,7 @@ const stackSeg = (bucket, person, index, stackTotal) => {
 
 export function stats(month, items, prevItems, categoryType, people = []) {
   // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從圖表消失。
-  const recordPeople = [...new Set([...people, ...items.map((it) => it.by || '')])];
+  const recordPeople = colorPeople(items, people);
   const { expense, income, net } = calc.summarize(items);
   const spent = calc.byDay(items, month, 'expense');
   // 只畫支出；收入資料照常記錄，但不在這張圖上呈現。
@@ -199,14 +202,15 @@ export function recordsView(items, filters, people = []) {
         <select data-filter="by" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
       </div>
       <div class="record-sort"><div class="seg" role="group" aria-label="排序">${sortButtons}</div><button type="button" id="record-clear" class="text-button" title="清除搜尋與篩選">清除</button></div>
-      <div id="record-results">${records(items, filters)}</div>
+      <div id="record-results">${records(items, filters, people)}</div>
     </div>`;
 }
 
-export function records(items, filters) {
+export function records(items, filters, people = []) {
+  const colors = new Map(colorPeople(items, people).map((p, i) => [p, personColor(i)]));
   const found = calc.sortItems(calc.filterItems(items, filters), filters);
   const totals = calc.summarize(found);
-  return `<p class="results-summary" role="status">${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found) : `<p class="empty">${items.length ? '沒有符合的紀錄' : '這個月還沒有紀錄'}</p>`}`;
+  return `<p class="results-summary" role="status">${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found, colors) : `<p class="empty">${items.length ? '沒有符合的紀錄' : '這個月還沒有紀錄'}</p>`}`;
 }
 
 /* ---------- 設定 ---------- */

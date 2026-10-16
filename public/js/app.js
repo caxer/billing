@@ -541,7 +541,7 @@ function bind() {
       const key = e.target.dataset.filter;
       if (!key || (key === 'query' ? event !== 'input' : event !== 'change')) return;
       filters[key] = e.target.value;
-      $('#record-results').innerHTML = views.records(state.allItems(), filters);
+      $('#record-results').innerHTML = views.records(state.allItems(), filters, settings.people());
     });
   }
 
