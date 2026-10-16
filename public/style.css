@@ -538,6 +538,9 @@ select { padding-right: 34px; }
 .share-more summary { padding: 8px 0; color: var(--muted); font-size: 13px; cursor: pointer; }
 .report-controls .seg-btn { padding: 10px 6px; font-size: 13px; white-space: nowrap; }
 .report-controls .field { margin: 0; }
+.year-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.year-nav .btn-quiet { min-width: var(--tap); padding: 4px 10px; font-size: 22px; }
+.year-nav .btn-quiet:disabled { opacity: .35; }
 .report-status { margin: 0 2px; font-size: 12px; color: var(--muted); }
 .report-notice { padding: 12px 16px; margin: 0; border-radius: var(--button-radius); background: var(--accent-soft); color: var(--text); font-size: 13px; }
 ul.report-notice { padding-left: 32px; }

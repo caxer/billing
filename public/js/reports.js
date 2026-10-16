@@ -22,7 +22,7 @@ export function init(element, getters) {
     <div class="stack billing-layout">
       <div class="card report-controls">
         <div class="seg" role="group" aria-label="月結檢視"><button class="seg-btn is-on" type="button" data-report-mode="year" aria-pressed="true" title="年度月表">月表</button><button class="seg-btn" type="button" data-report-mode="compare" aria-pressed="false" title="跨年比較">跨年</button><button class="seg-btn" type="button" data-report-mode="yoy" aria-pressed="false" title="分類 YOY">YOY</button><button class="seg-btn" type="button" data-report-mode="share" aria-pressed="false" title="分類占比與日常內容排行">占比</button><button class="seg-btn" type="button" data-report-mode="bank" aria-pressed="false" title="土銀帳：水電氣">${billing.UTILITY_PAYER}</button><button class="seg-btn" type="button" data-report-mode="fund" aria-pressed="false" title="公積金帳：公婆額度與額外收入，支付房、女兒、兒子與日常">公積金</button></div>
-        <label class="field"><select id="billing-year" aria-label="月結年度"></select></label>
+        <div class="year-nav"><button type="button" class="btn-quiet" data-report-year="-1" aria-label="前一年">‹</button><label class="field"><select id="billing-year" aria-label="月結年度"></select></label><button type="button" class="btn-quiet" data-report-year="1" aria-label="後一年">›</button></div>
       </div>
       <p id="billing-status" class="report-status" role="status"></p>
       <div id="billing-content" class="stack"></div>
@@ -33,6 +33,13 @@ export function init(element, getters) {
   root.addEventListener('click', (e) => {
     const button = e.target.closest('[data-report-mode]');
     if (button) { mode = button.dataset.reportMode; detailMonth = null; draw(); }
+    const step = e.target.closest('[data-report-year]');
+    if (step) {
+      // 年度選單由新到舊排列：前一年是下一個選項。
+      const years = allYears(), i = years.indexOf(year) - Number(step.dataset.reportYear);
+      if (years[i]) { year = years[i]; detailMonth = null; draw(); }
+      return;
+    }
     const scope = e.target.closest('[data-share-scope]');
     if (scope) { shareScope = scope.dataset.shareScope; draw(); }
     const topBy = e.target.closest('[data-share-top]');
@@ -111,6 +118,9 @@ function draw() {
   if (JSON.stringify([...select.options].map((o) => o.value)) !== JSON.stringify(years)) {
     select.replaceChildren(...years.map((y) => new Option(`${y} 年`, y, false, y === year)));
   } else select.value = year;
+  const yearIndex = years.indexOf(year);
+  root.querySelector('[data-report-year="-1"]').disabled = yearIndex >= years.length - 1;
+  root.querySelector('[data-report-year="1"]').disabled = yearIndex <= 0;
   for (const button of root.querySelectorAll('[data-report-mode]')) {
     button.classList.toggle('is-on', mode === button.dataset.reportMode);
     button.setAttribute('aria-pressed', String(mode === button.dataset.reportMode));
@@ -180,11 +190,11 @@ function shareView() {
   const bar = (name, value, total, extra = '', color = '', scale = total) => `<div class="cat"><span class="cat-name">${esc(name)}${extra}</span><span class="cat-pct">${total ? (value / total * 100).toFixed(1) : 0}%</span><span class="cat-amount">${money(value)}</span><span class="cat-bar"><span style="width:${scale ? Math.max(0, value / scale * 100) : 0}%${color ? `;background:${color}` : ''}"></span></span></div>`;
   const catTotal = s.categories.reduce((sum, c) => sum + c.amount, 0);
   const topTotal = s.groups.find((g) => g.name === '扣除列項後開銷')?.amount || 0;
-  const top = s.top.map((t, i) => bar(`${i + 1}. ${t.name}`, t.amount, topTotal, `<small class="share-count">${t.count} 筆 · 平均 ${money(Math.round(t.amount / t.count))}</small>`, '', s.top[0].amount)).join('');
+  const top = s.top.map((t, i) => bar(`${i + 1}. ${t.name}`, t.amount, topTotal, `<small class="share-count">${t.count} 筆 · 平均 ${money(Math.round(t.amount / t.count))}${t.parts.length > 1 ? ` · ${t.parts.slice(0, 3).map((p) => `${esc(p.name || '未寫品項')} ${p.count}`).join('、')}` : ''}</small>`, '', s.top[0].amount)).join('');
   const shown = 12, rest = s.categories.slice(shown);
   return `<div class="card"><div class="seg share-scope" role="group" aria-label="占比範圍">${scopeButtons}</div><p class="setting-hint">${range} · 家庭總支出 ${amount(s.total)}</p></div>
     <div class="card"><h3 class="section-title">大項占比</h3>${s.groups.length ? s.groups.map((g) => bar(g.name, g.amount, s.total, '', g.color)).join('') : '<p class="empty">沒有支出</p>'}</div>
-    <div class="card"><div class="section-head"><h3 class="section-title" title="占日常（扣除列項後開銷）的比例；依備註合計">日常 Top 10</h3><span class="seg share-top" role="group" aria-label="排行依據">${[['amount', '金額'], ['count', '次數']].map(([key, label]) => `<button type="button" class="seg-btn ${shareTop === key ? 'is-on' : ''}" data-share-top="${key}" aria-pressed="${shareTop === key}">${label}</button>`).join('')}</span></div>${top || '<p class="empty">沒有日常明細</p>'}</div>
+    <div class="card"><div class="section-head"><h3 class="section-title" title="占日常（扣除列項後開銷）的比例；依備註空格前的店名合計，例如 7-11、7-11 早餐都算 7-11">日常 Top 10</h3><span class="seg share-top" role="group" aria-label="排行依據">${[['amount', '金額'], ['count', '次數']].map(([key, label]) => `<button type="button" class="seg-btn ${shareTop === key ? 'is-on' : ''}" data-share-top="${key}" aria-pressed="${shareTop === key}">${label}</button>`).join('')}</span></div>${top || '<p class="empty">沒有日常明細</p>'}</div>
     <div class="card"><h3 class="section-title">分類占比</h3>${s.categories.slice(0, shown).map((c) => bar(c.name, c.amount, catTotal)).join('') || '<p class="empty">沒有支出</p>'}
       ${rest.length ? `<details class="share-more" id="share-more"><summary>其餘 ${rest.length} 個分類</summary>${rest.map((c) => bar(c.name, c.amount, catTotal)).join('')}</details>` : ''}</div>`;
 }
@@ -350,6 +360,14 @@ function yoyView() {
 }
 
 export const selectedDetailMonth = () => detailMonth;
+
+/** 全部月份的紀錄：同步一次月份目錄，只重讀有變更的月份。 */
+export async function loadAll() {
+  await refresh();
+  return initialized;
+}
+export const allRecords = () => records;
+export const allLoaded = () => initialized;
 
 export function lock() {
   archive = null;

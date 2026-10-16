@@ -389,7 +389,8 @@ export function bankYear(ledger, year) {
 
 /**
  * 一段期間的占比：大項（月結口徑，公積金收入抵扣日常）、支出分類、日常內容排行。
- * 內容排行依備註合計，同樣的店或品項（例如全聯）合在一起；沒寫備註的不列。
+ * 內容排行依備註空格前的第一個詞（店名）合計，例如「7-11」「7-11 早餐」都算 7-11，
+ * 空格後的品項列在 parts；沒寫備註的不列。
  */
 export function shareSummary(items, mappings = {}, top = 10, by = 'amount') {
   const summary = transactionSummary(items, mappings);
@@ -402,15 +403,22 @@ export function shareSummary(items, mappings = {}, top = 10, by = 'amount') {
     const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
     const note = String(it.note || '').trim();
     if (group !== '日常' || !note) continue;
-    const entry = notes.get(note) || { name: note, amount: 0, count: 0 };
+    const [store, ...rest] = note.split(/\s+/);
+    const entry = notes.get(store) || { name: store, amount: 0, count: 0, parts: new Map() };
     entry.amount += it.amount;
     entry.count++;
-    notes.set(note, entry);
+    const part = rest.join(' ');
+    const sub = entry.parts.get(part) || { name: part, amount: 0, count: 0 };
+    sub.amount += it.amount;
+    sub.count++;
+    entry.parts.set(part, sub);
+    notes.set(store, entry);
   }
   return {
     total: summary.total, groups,
     categories: [...categories].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
-    top: [...notes.values()].sort((a, b) => (by === 'count' ? b.count - a.count : 0) || b.amount - a.amount).slice(0, top),
+    top: [...notes.values()].sort((a, b) => (by === 'count' ? b.count - a.count : 0) || b.amount - a.amount).slice(0, top)
+      .map((t) => ({ ...t, parts: [...t.parts.values()].sort((a, b) => (by === 'count' ? b.count - a.count : 0) || b.amount - a.amount) })),
   };
 }
 

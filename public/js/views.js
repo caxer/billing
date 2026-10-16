@@ -179,7 +179,7 @@ export function stats(month, items, prevItems, categoryType, people = []) {
 
 const SORTS = [['date', '日期', '新到舊', '舊到新'], ['amount', '金額', '大到小', '小到大']];
 
-export function recordsView(items, filters, people = []) {
+export function recordsView(items, filters, people = [], scope = '') {
   // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從篩選消失。
   const filterPeople = [...new Set([...people, ...items.map((it) => it.by || ''), filters.by || ''].filter(Boolean))];
   const sortButtons = SORTS.map(([key, label, desc, asc]) => {
@@ -189,20 +189,21 @@ export function recordsView(items, filters, people = []) {
   return `
     <div class="stack records-section">
       <div class="record-filters">
-        <input id="record-query" class="search-field" type="search" data-filter="query" aria-label="搜尋紀錄" placeholder="搜尋內容、分類、日期、金額" value="${esc(filters.query || '')}" autocomplete="off"/>
+        <input id="record-query" class="search-field" type="search" data-filter="query" aria-label="搜尋紀錄" placeholder="搜尋全部時段：內容、分類、日期、金額" value="${esc(filters.query || '')}" autocomplete="off"/>
         <select data-filter="type" data-choices="auto" aria-label="收支"><option value="">全部</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
         <select data-filter="by" data-choices="auto" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
       </div>
       <div class="record-sort"><div class="seg" role="group" aria-label="排序">${sortButtons}</div><button type="button" id="record-clear" class="text-button" title="清除搜尋與篩選">清除</button></div>
-      <div id="record-results">${records(items, filters, people)}</div>
+      <div id="record-results">${records(items, filters, people, scope)}</div>
     </div>`;
 }
 
-export function records(items, filters, people = []) {
+/** scope 有值時（例如「全部時段」）表示搜尋範圍不是本月，摘要前面標出來。 */
+export function records(items, filters, people = [], scope = '') {
   const colors = new Map(colorPeople(items, people).map((p, i) => [p, personColor(i)]));
   const found = calc.sortItems(calc.filterItems(items, filters), filters);
   const totals = calc.summarize(found);
-  return `<p class="results-summary" role="status">${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found, colors) : `<p class="empty">${items.length ? '沒有符合的紀錄' : '這個月還沒有紀錄'}</p>`}`;
+  return `<p class="results-summary" role="status">${scope ? `${esc(scope)} · ` : ''}${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found, colors) : `<p class="empty">${items.length ? '沒有符合的紀錄' : '這個月還沒有紀錄'}</p>`}`;
 }
 
 /* ---------- 設定 ---------- */

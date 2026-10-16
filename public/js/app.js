@@ -177,7 +177,8 @@ function render() {
   } else if (view === 'records') {
     const active = document.activeElement;
     const selection = active?.id === 'record-query' ? [active.selectionStart, active.selectionEnd] : null;
-    $('#view-records').innerHTML = views.recordsView(state.allItems(), filters, settings.people());
+    const { items, scope } = recordPool();
+    $('#view-records').innerHTML = views.recordsView(items, filters, settings.people(), scope);
     enhance($('#view-records'));
     if (selection) {
       const input = $('#record-query');
@@ -445,6 +446,37 @@ function resetForm() {
   if (view === 'add') ui.title.textContent = TITLES.add;
 }
 
+/* ---------- 明細搜尋：有關鍵字時搜尋全部時段 ---------- */
+
+let allLoading = null;
+
+/** 沒有關鍵字列本月；有關鍵字搜尋全部月份（本月用最新的狀態）。 */
+function recordPool() {
+  if (!filters.query.trim()) { allLoading = null; return { items: state.allItems(), scope: '' }; }
+  if (!allLoading) {
+    allLoading = reports.loadAll().then((ok) => {
+      if (!ok) allLoading = null;
+      if (view === 'records' && filters.query.trim()) refreshRecordResults();
+    });
+  }
+  const all = { ...reports.allRecords(), [month]: state.allItems() };
+  return { items: Object.values(all).flat(), scope: reports.allLoaded() ? '全部時段' : '全部時段讀取中' };
+}
+
+function refreshRecordResults() {
+  const box = $('#record-results');
+  if (!box) return;
+  const { items, scope } = recordPool();
+  box.innerHTML = views.records(items, filters, settings.people(), scope);
+}
+
+/** 點搜尋結果：別的月份的紀錄先切到那個月再編輯。 */
+async function openRecord(id) {
+  if (state.allItems().some((it) => it.id === id)) return editRecord(id);
+  const found = Object.values(reports.allRecords()).flat().find((it) => it.id === id);
+  if (found && await switchMonth(found.date.slice(0, 7))) editRecord(id);
+}
+
 function editRecord(id) {
   if (working) return;
   const item = state.allItems().find((it) => it.id === id);
@@ -686,7 +718,8 @@ function bind() {
       const key = e.target.dataset.filter;
       if (!key || (key === 'query' ? event !== 'input' : event !== 'change')) return;
       filters[key] = e.target.value;
-      $('#record-results').innerHTML = views.records(state.allItems(), filters, settings.people());
+      const { items, scope } = recordPool();
+      $('#record-results').innerHTML = views.records(items, filters, settings.people(), scope);
     });
   }
 
@@ -703,7 +736,7 @@ function bind() {
       return render();
     }
     const row = e.target.closest('.row[data-id]');
-    if (row) editRecord(row.dataset.id);
+    if (row) openRecord(row.dataset.id);
   });
 
   $('#view-stats').addEventListener('click', (e) => {
