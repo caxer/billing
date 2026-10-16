@@ -213,7 +213,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
   width: 100%;
   max-width: 960px;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(8px);
   border-top: 1px solid var(--line);
@@ -233,7 +233,6 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 /* ---------- 數字卡 ---------- */
 
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.tiles-2 { grid-template-columns: repeat(2, 1fr); }
 
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
 .tile-label { font-size: 12px; color: var(--muted); }
@@ -420,6 +419,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .setting-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
 #view-settings summary { cursor: pointer; min-height: 28px; }
 .tag .tag-edit:hover { background: var(--accent-soft); }
+.tag-fixed { color: var(--muted); padding: 6px 12px; }
 
 .toast {
   position: fixed;
@@ -479,7 +479,7 @@ select { padding-right: 34px; }
 @media (min-width: 760px) {
   .topbar { padding: 18px 28px 12px; }
   main { padding: 24px 28px 100px; }
-  .dashboard-grid, .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
   .tiles, .records-section { grid-column: 1 / -1; }
   .tile { padding: 20px; }
   .tile-value { font-size: 30px; margin-top: 6px; }

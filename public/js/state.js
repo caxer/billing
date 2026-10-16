@@ -58,8 +58,10 @@ export async function reload() {
  * 改紀錄。fn 直接改傳入的陣列；回傳 false 代表取消，不會寫入。
  * 撞到 409 就重讀重試，最多三次。
  */
-export function mutate(fn) {
-  const target = month;
+export const mutate = (fn) => mutateMonth(month, fn);
+
+/** 改任一個月份的紀錄，和本月的寫入排在同一個佇列。 */
+export function mutateMonth(target, fn) {
   const operation = writes.then(() => writeMutation(target, fn));
   writes = operation.catch(() => {});
   return operation;

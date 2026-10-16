@@ -6,7 +6,7 @@ import * as settings from './settings.js';
 import * as calc from './calc.js';
 import * as views from './views.js';
 import { readStored, writeStored, removeStored } from './storage.js';
-import { classify, GROUPS, UTILITY_PAYER } from './billing.js';
+import { classify, GROUPS, UTILITY_PAYER, FUND_PAYER } from './billing.js';
 import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
 
@@ -23,9 +23,9 @@ const ui = {
 
 const loginScreen = initLoginScreen(ui.lock, { onKey: (key) => unlockAccount(key, true) });
 
-const TITLES = { dashboard: '看板', add: '記帳', records: '明細', stats: '統計', billing: '月結', settings: '設定' };
+const TITLES = { add: '記帳', records: '明細', stats: '統計', billing: '月結', settings: '設定' };
 
-let view = 'dashboard';
+let view = 'add';
 let month = calc.monthKey();
 let prevItems = [];
 let categoryType = 'expense';
@@ -169,9 +169,7 @@ function show(next) {
 /* ---------- 繪製 ---------- */
 
 function render() {
-  if (view === 'dashboard') {
-    $('#view-dashboard').innerHTML = views.dashboard(month, state.allItems(), prevItems, settings.people());
-  } else if (view === 'stats') {
+  if (view === 'stats') {
     $('#view-stats').innerHTML = views.stats(month, state.allItems(), prevItems, categoryType, settings.people());
   } else if (view === 'records') {
     const active = document.activeElement;
@@ -529,13 +527,6 @@ function bind() {
     }
   });
 
-  $('#view-dashboard').addEventListener('click', (e) => {
-    const action = e.target.closest('[data-go]');
-    if (action) return show(action.dataset.go);
-    const row = e.target.closest('.row[data-id]');
-    if (row) editRecord(row.dataset.id);
-  });
-
   for (const event of ['input', 'change']) {
     $('#view-records').addEventListener(event, (e) => {
       const key = e.target.dataset.filter;
@@ -562,6 +553,8 @@ function bind() {
   });
 
   $('#view-stats').addEventListener('click', (e) => {
+    const go = e.target.closest('[data-go]');
+    if (go) return show(go.dataset.go);
     const sw = e.target.closest('[data-cat-switch]');
     if (sw) {
       categoryType = sw.dataset.type;
@@ -593,18 +586,9 @@ function bindSettings() {
     const delBtn = e.target.closest('[data-del-cat]');
     const budgetBtn = e.target.closest('[data-budget-person]');
     const renameBtn = e.target.closest('[data-rename-person]');
-    const delPersonBtn = e.target.closest('[data-del-person]');
     if (e.target.closest('[data-go="billing"]')) return show('billing');
     if (e.target.closest('#set-export')) return exportCsv();
-    if (e.target.closest('#set-lock')) {
-      if (working || !confirm('移除後，這台裝置要重新點專屬連結才能開啟帳本。確定移除？')) return;
-      reports.lock();
-      store.lock();
-      if (!(await LinkKey.forget())) return toast('無法移除登入，請允許網站儲存後再試');
-      location.reload();
-      return;
-    }
-    if (working || (!addBtn && !delBtn && !budgetBtn && !renameBtn && !delPersonBtn)) return;
+    if (working || (!addBtn && !delBtn && !budgetBtn && !renameBtn)) return;
     const targetMonth = month;
     setWorking(true);
     setSync('busy', '儲存設定');
@@ -657,6 +641,7 @@ function bindSettings() {
         const name = answer?.trim();
         if (!name || name === from) return;
         if (settings.people().includes(name)) throw new Error(`已經有「${name}」了`);
+        if ([UTILITY_PAYER, FUND_PAYER].includes(name)) throw new Error(`「${name}」是帳戶名稱，請換一個`);
         await settings.save((s) => {
           if (!s.people.includes(from)) throw new Error('這位記帳人已被修改，請同步後再試');
           if (s.people.includes(name)) throw new Error(`已經有「${name}」了`);
@@ -670,32 +655,22 @@ function bindSettings() {
           me = name;
           writeStored('spa-me', name);
         }
-        // 本月紀錄一起改名，其他月份讀不到，這裡明確只處理已載入的那個月。
-        await state.mutate((list) => {
-          for (const it of list) if (it.by === from) it.by = name;
-        });
-        toast(`已改成「${name}」`);
-      }
-
-      if (delPersonBtn) {
-        const name = delPersonBtn.dataset.delPerson;
-        if (!settings.members().some((p) => p !== name)) throw new Error('請至少保留一位記帳人');
-        const used = state.allItems().filter((it) => it.by === name).length;
-        const tail = used ? `本月有 ${used} 筆紀錄記在這個人名下，紀錄不會被刪除。` : '本月沒有這個人的紀錄。';
-        if (!confirm(`確定刪除記帳人「${name}」？${tail}`)) return;
-        await settings.save((s) => {
-          const remaining = s.people.filter((p) => p !== name);
-          if (!remaining.some((p) => p !== UTILITY_PAYER)) throw new Error('請至少保留一位記帳人');
-          s.people = remaining;
-          if (s.budgets) delete s.budgets[name];
-        });
-        if (me === name) {
-          me = settings.members()[0];
-          writeStored('spa-me', me);
-          toast(`已刪除，這支手機改用「${me}」`);
-        } else {
-          toast('已刪除');
+        // 所有月份的紀錄一起改名，歷史月份的額外收入與公積金帳才不會斷成兩個人。
+        const months = [...new Set([targetMonth, ...(await store.listMonths()).map((f) => f.month)])];
+        const used = [];
+        for (let i = 0; i < months.length; i += 6) {
+          const loaded = await Promise.all(months.slice(i, i + 6).map((m) => store.loadMonth(m)));
+          used.push(...loaded.filter((d) => d.items.some((it) => it.by === from)).map((d) => d.month));
         }
+        for (const [i, m] of used.entries()) {
+          setSync('busy', `改名 ${i + 1}/${used.length}`);
+          await state.mutateMonth(m, (list) => {
+            const hits = list.filter((it) => it.by === from);
+            if (!hits.length) return false;
+            for (const it of hits) it.by = name;
+          });
+        }
+        toast(`已改成「${name}」${used.length ? `，${used.length} 個月的紀錄一起改` : ''}`);
       }
 
       render();
@@ -781,7 +756,7 @@ async function start() {
 
   ui.app.hidden = false;
   resetForm();
-  show('dashboard');
+  show('add');
 }
 
 async function boot() {

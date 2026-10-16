@@ -83,7 +83,7 @@ function recordRow(it, color) {
 
 const recordList = (items, colors) => `<ul class="list">${items.map((it) => recordRow(it, colors.get(it.by || ''))).join('')}</ul>`;
 
-/* ---------- 看板 ---------- */
+/* ---------- 統計：本月月結與額度 ---------- */
 
 function billingCard(items) {
   const summary = transactionSummary(items, allSettings()?.billingGroups);
@@ -91,21 +91,6 @@ function billingCard(items) {
     <div class="billing-mini-grid">${[['月消費總額', summary.monthlyTotal, '含房與子女'], ['扣除列項後開銷', summary.daily, '日常'], ['水電氣', summary.utilities, '另計'], ['家庭總支出', summary.total, '月消費總額＋水電氣']].map(([name, total, tip]) =>
       `<div title="${tip}"><span class="setting-hint">${name}</span><strong>${calc.money(total)}</strong></div>`).join('')}</div>
     <div class="billing-parts">${[['房', summary.house], ['女兒', summary.daughter], ['兒子', summary.son]].map(([name, total]) => `<span>${name} <b>${calc.money(total)}</b></span>`).join('')}</div></div>`;
-}
-
-export function dashboard(month, items, prevItems, people) {
-  const { expense, income } = calc.summarize(items);
-  const previous = calc.summarize(prevItems);
-
-  return `
-    <div class="stack dashboard-grid">
-      <div class="tiles tiles-2">
-        ${tile('本月支出', calc.money(expense), 'is-expense', changeSub(expense, previous.expense))}
-        ${tile('本月收入', calc.money(income), 'is-income', changeSub(income, previous.income))}
-      </div>
-      ${billingCard(items)}
-      ${budgetCard(items, month, people)}
-    </div>`;
 }
 
 /* ---------- 統計 ---------- */
@@ -121,6 +106,7 @@ export function stats(month, items, prevItems, categoryType, people = []) {
   // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從圖表消失。
   const recordPeople = colorPeople(items, people);
   const { expense, income, net } = calc.summarize(items);
+  const previous = calc.summarize(prevItems);
   const spent = calc.byDay(items, month, 'expense');
   // 只畫支出；收入資料照常記錄，但不在這張圖上呈現。
   const peak = Math.max(0, ...spent.map((d) => d.total));
@@ -145,10 +131,12 @@ export function stats(month, items, prevItems, categoryType, people = []) {
   return `
     <div class="stack stats-grid">
       <div class="tiles">
-        ${tile('支出', calc.money(expense), 'is-expense', changeSub(expense, calc.summarize(prevItems).expense))}
-        ${tile('收入', calc.money(income), 'is-income')}
+        ${tile('支出', calc.money(expense), 'is-expense', changeSub(expense, previous.expense))}
+        ${tile('收入', calc.money(income), 'is-income', changeSub(income, previous.income))}
         ${tile('淨額', calc.signedMoney(net), net < 0 ? 'is-expense' : 'is-income')}
       </div>
+      ${billingCard(items)}
+      ${budgetCard(items, month, people)}
 
       <div class="card">
         <div class="budget-head"><span class="budget-title">每日支出</span>
@@ -216,7 +204,7 @@ export function records(items, filters, people = []) {
 /* ---------- 設定 ---------- */
 
 export function settings(ctx) {
-  const { people, members = people, expenseCats, incomeCats, month, me, theme, budgets = {}, isLocal } = ctx;
+  const { people, members = people, expenseCats, incomeCats, month, me, theme, budgets = {} } = ctx;
   const totalLimit = members.reduce((sum, person) => sum + budgetFor(person, month), 0);
   const catTags = (list, kind) => list
     .map((c) => `<span class="tag">${esc(c)}<button type="button" data-del-cat="${kind}" data-category="${esc(c)}" aria-label="刪除 ${esc(c)}">×</button></span>`)
@@ -259,11 +247,9 @@ export function settings(ctx) {
 
       <div class="card">
         <div class="budget-title">記帳人</div>
-        <div class="tag-list" id="people-list">${people.map((p, i) => `
-          <span class="tag">
-            <button type="button" class="tag-edit" data-rename-person="${esc(p)}" aria-label="把 ${esc(p)} 改名" title="點名字改名，本月紀錄一起改">${esc(p)}</button>
-            <button type="button" data-del-person="${esc(p)}" aria-label="刪除 ${esc(p)}">×</button>
-          </span>`).join('')}</div>
+        <div class="tag-list" id="people-list">${people.map((p) => p === UTILITY_PAYER
+          ? `<span class="tag tag-fixed" title="水電氣扣款帳戶，不能改名">${esc(p)}</span>`
+          : `<span class="tag"><button type="button" class="tag-edit" data-rename-person="${esc(p)}" aria-label="把 ${esc(p)} 改名" title="點名字改名，所有月份的紀錄一起改">${esc(p)} <span aria-hidden="true">✎</span></button></span>`).join('')}</div>
       </div>
 
       <div class="card">
@@ -287,7 +273,6 @@ export function settings(ctx) {
 
       <div class="setting-actions">
         <button type="button" class="btn-quiet" id="set-export" title="匯出${calc.monthLabel(month)}全部紀錄，可用 Excel 開啟">匯出 CSV</button>
-        ${!isLocal ? `<button type="button" class="btn-quiet" id="set-lock" title="這台裝置下次需要重新點專屬連結">登出此裝置</button>` : ''}
       </div>
     </div>`;
 }
