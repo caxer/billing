@@ -12,6 +12,7 @@ import { initLoginScreen } from './login-screen.js';
 import * as ai from './ai.js';
 import { preparePhoto } from './photo.js';
 import { asButtons, enhance } from './choices.js';
+import { applyAliases } from './rules.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -256,7 +257,9 @@ let categoryTouched = false;
 function guessFromNote() {
   if (categoryTouched || editingId) return;
   const select = $('#add-category');
-  const guess = guessCategory($('#add-note').value, addType, [...state.allItems(), ...prevItems], settings.categories(addType));
+  const rules = settings.all()?.rules || {};
+  const note = applyAliases($('#add-note').value, rules.aliases);
+  const guess = guessCategory(note, addType, [...state.allItems(), ...prevItems], settings.categories(addType), rules.keywords);
   $('#add-category-auto').textContent = '自動';
   $('#add-category-auto').hidden = !guess;
   if (!guess || guess === select.value) return;
@@ -564,7 +567,8 @@ async function submitForm(event) {
     amount,
     date: $('#add-date').value,
     category: $('#add-category').value,
-    note: $('#add-note').value.trim(),
+    // 別名規則：例如 711早餐 → 7-11 早餐、楊博士 → 羊博士。
+    note: applyAliases($('#add-note').value.trim(), settings.all()?.rules?.aliases),
     by: $('#add-by').value,
   };
   if (addType === 'expense') {

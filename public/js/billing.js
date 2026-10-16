@@ -1,5 +1,6 @@
 // 月結的純計算與分類對應；歷史合計與新交易永遠擇一使用。
 import { shiftMonth, seriesStats, isAdjustment } from './calc.js';
+import { ruleCategory } from './rules.js';
 export const GROUPS = ['日常', '房', '女兒', '兒子', '水電氣'];
 /** 日常的分類（食衣住行育樂），固定順序。 */
 export const DAILY_ORDER = ['食', '衣', '住', '行', '育', '樂', '醫', '其他'];
@@ -70,16 +71,18 @@ const GUESS_RULES = {
 };
 
 /**
- * 依「內容」判斷分類：先沿用以前同樣內容最近一次的分類，再看關鍵字；判斷不出來回傳 null。
- * allowed 是目前可選的分類，判斷結果一定在裡面。
+ * 依「內容」判斷分類：先沿用以前同樣內容最近一次的分類，再看使用者的關鍵字規則（設定 rules.keywords），
+ * 最後看內建關鍵字；判斷不出來回傳 null。allowed 是目前可選的分類，判斷結果一定在裡面。
  */
-export function guessCategory(note, type, history = [], allowed = []) {
+export function guessCategory(note, type, history = [], allowed = [], keywords = []) {
   const text = String(note || '').trim().toLowerCase();
   if (!text) return null;
   const ok = (category) => allowed.includes(category);
   const past = history.filter((it) => it.type === type && String(it.note || '').trim().toLowerCase() === text && ok(it.category))
     .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   if (past) return past.category;
+  const ruled = type === 'expense' ? ruleCategory(text, keywords, allowed) : null;
+  if (ruled) return ruled;
   for (const [pattern, category] of GUESS_RULES[type] || []) if (pattern.test(text) && ok(category)) return category;
   return null;
 }
@@ -95,6 +98,7 @@ export function upgradeSettings(value) {
     next.billingVersion = 2;
   }
   next.billingGroups ||= {};
+  next.rules ||= { aliases: [], keywords: [] };
   return next;
 }
 
