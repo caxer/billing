@@ -521,10 +521,10 @@ select { padding-right: 34px; }
 .report-status { margin: 0 2px; font-size: 12px; color: var(--muted); }
 .report-notice { padding: 12px 16px; margin: 0; border-radius: var(--button-radius); background: var(--accent-soft); color: var(--text); font-size: 13px; }
 ul.report-notice { padding-left: 32px; }
-.billing-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.billing-tiles .tile { padding: 8px; }
-.billing-tiles .tile-label { font-size: 11px; line-height: 1.3; }
-.billing-tiles .tile-value { font-size: clamp(14px, 4.2vw, 30px); }
+.billing-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.billing-tiles .tile { padding: 10px 12px; min-width: 0; }
+.billing-tiles .tile-label { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.billing-tiles .tile-value { font-size: clamp(18px, 5.4vw, 30px); white-space: nowrap; overflow-wrap: normal; }
 .tile-period { grid-column: 1 / -1; margin: 0 2px; font-size: 12px; color: var(--muted); }
 .report-table-wrap { overflow: auto; max-width: 100%; margin: 8px 0 0; border: 1px solid var(--line); border-radius: 10px; }
 .report-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -532,21 +532,29 @@ ul.report-notice { padding-left: 32px; }
 .report-table thead th { background: var(--bg); font-size: 12px; color: var(--muted); }
 .report-table th:first-child { position: sticky; left: 0; text-align: left; background: var(--surface); border-right: 1px solid var(--line); z-index: 1; }
 .report-table small { display: block; color: var(--muted); font-size: 10px; font-weight: 400; margin-top: 2px; }
+.report-table td small { display: inline; margin: 0 0 0 4px; font-size: 11px; }
+.report-table th, .report-table td { padding: 6px 10px; }
+.report-table tbody tr:nth-child(even) > td { background: color-mix(in srgb, var(--bg) 45%, transparent); }
 .report-table tr:last-child > * { border-bottom: 0; }
 .report-total > * { font-weight: 700; background: var(--accent-soft) !important; }
 .future-month td { color: var(--muted); }
 .report-table .text-button { min-height: 28px; padding: 2px 8px; }
 .billing-layout summary { cursor: pointer; font-weight: 600; min-height: 44px; display: list-item; padding: 8px 0; }
 @media (min-width: 760px) {
-  .billing-mini-grid, .billing-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .billing-mini-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* 寬螢幕摘要格平均撐滿一排，土銀的三格也一樣。 */
+  .billing-tiles { display: flex; flex-wrap: wrap; }
+  .billing-tiles .tile { flex: 1 1 150px; }
+  .billing-tiles .tile-period { flex-basis: 100%; }
   .report-controls { grid-template-columns: minmax(0, 1fr) 170px; }
   .report-controls .seg { grid-column: auto; align-self: center; }
   .tabs { max-width: 640px; }
 }
 
-.report-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.report-kpis .card { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px; }
-.report-kpis strong { font-size: clamp(15px, 4.2vw, 22px); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.report-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.report-kpis .card { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; }
+.report-kpis strong { font-size: clamp(17px, 5vw, 22px); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.report-kpis .setting-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chart-card { min-width: 0; }
 .chart-card .section-head { flex-wrap: wrap; align-items: start; }
 .chart-tools { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -584,11 +592,11 @@ ul.report-notice { padding-left: 32px; }
 .report-table small.yoy-delta.is-income { color: var(--income); }
 .report-table small.yoy-delta.is-expense { color: var(--expense); }
 @media (min-width: 760px) {
-  .report-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .report-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .item-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* 窄螢幕四個數字放不下，改回兩欄；要放在月結樣式之後才蓋得過。 */
 @media (max-width: 360px) {
-  .billing-mini-grid, .billing-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .billing-mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

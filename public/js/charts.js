@@ -24,6 +24,13 @@ function coordinates(count, values, cumulative) {
   return { width, height, left, right, top, bottom, plotWidth, plotHeight, x, y, upper, lower };
 }
 
+/** 文字靠近圖的左右邊緣時改成貼齊邊緣，避免被裁掉。 */
+function labelAt(c, x) {
+  if (x > c.width - c.right - 60) return `x="${c.width - c.right}" text-anchor="end"`;
+  if (x < c.left + 60) return `x="${c.left}" text-anchor="start"`;
+  return `x="${x}" text-anchor="middle"`;
+}
+
 function cumulativeScale(values, c) {
   const known = values.filter(finite);
   const upper = Math.max(1, ...known) * 1.15, lower = Math.min(0, ...known) * 1.15;
@@ -73,7 +80,7 @@ export function stackedChart(points, groups, options) {
   if (options.extrema) {
     for (const [label, entries] of [['最高', stats.highest], ['最低', stats.lowest]]) {
       // 同額月份只標示第一個，避免整排文字擠在一起。
-      for (const p of entries.slice(0, 1)) body += `<text x="${c.x(p.index)}" y="${Math.max(c.top + 14, c.y(positive[p.index]) - (label === '最高' ? 9 : 23))}" text-anchor="middle" class="chart-extreme" data-extreme="${label}">${label} ${money(p.value)}</text>`;
+      for (const p of entries.slice(0, 1)) body += `<text ${labelAt(c, c.x(p.index))} y="${Math.max(c.top + 14, c.y(positive[p.index]) - (label === '最高' ? 9 : 23))}" class="chart-extreme" data-extreme="${label}">${label} ${money(p.value)}</text>`;
     }
   }
   const tooltip = (i) => {
@@ -95,7 +102,7 @@ export function lineChart(points, series, options) {
     if (options.cumulative && !s.isBalance) drawing += `<path class="chart-item-cumulative" stroke="${s.color}" d="${path(stats[index].cumulative, c.x, cumulativeAxis.y)}"/>`;
     if (options.extrema) {
       for (const [label, entries] of [['最高', stats[index].highest], ['最低', stats[index].lowest]]) {
-        for (const p of entries.slice(0, 1)) drawing += `<text x="${c.x(p.index)}" y="${Math.max(c.top + 14, c.y(p.value) - (label === '最高' ? 10 : 24) - index * 14)}" text-anchor="middle" class="chart-extreme" style="fill:${s.color}" data-extreme="${label}">${label} ${money(p.value)}</text>`;
+        for (const p of entries.slice(0, 1)) drawing += `<text ${labelAt(c, c.x(p.index))} y="${Math.max(c.top + 14, c.y(p.value) - (label === '最高' ? 10 : 24) - index * 14)}" class="chart-extreme" style="fill:${s.color}" data-extreme="${label}">${label} ${money(p.value)}</text>`;
       }
     }
     return drawing;

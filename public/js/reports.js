@@ -241,9 +241,9 @@ function kpiView(stats, previous) {
   const values = [
     ['月平均', amount(stats.average), '', `${stats.averageCount} 個有支出月份`],
     ['較去年同期', pctText, stats.totals.total === null || previous.total === null ? '缺少可比資料' : `${stats.totals.total >= previous.total ? '多花' : '少花'} ${amount(Math.abs(stats.totals.total - previous.total))}`],
-    ['最大支出類別', top?.name || '—', top ? `${amount(top.amount)} · ${stats.totals.total ? (top.amount / stats.totals.total * 100).toFixed(1) : 0}%` : '—'],
-    ['最高月份', peak ? `${Number(peak.month.slice(-2))}月` : '—', peak ? amount(peak.total) : '—'],
-    ['最低月份', low ? `${Number(low.month.slice(-2))}月` : '—', low ? amount(low.total) : '—'],
+    ['最大支出類別', top ? `${top.name} ${stats.totals.total ? (top.amount / stats.totals.total * 100).toFixed(0) : 0}%` : '—', top ? amount(top.amount) : '—'],
+    // 最高與最低放同一格，手機上四格剛好兩排。
+    ['最高／最低月份', peak && low ? `${Number(peak.month.slice(-2))}月／${Number(low.month.slice(-2))}月` : '—', peak && low ? `${amount(peak.total)}／${amount(low.total)}` : '—'],
   ];
   return `<div class="report-kpis" aria-label="期間重點指標">${values.map(([name, value, sub, tip = '']) => `<div class="card"${tip ? ` title="${esc(tip)}"` : ''}><span class="setting-hint">${name}</span><strong>${esc(value)}</strong>${sub ? `<span class="setting-hint">${esc(sub)}</span>` : ''}</div>`).join('')}</div>`;
 }
