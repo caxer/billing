@@ -209,6 +209,7 @@ export function validateArchive(archive) {
   if (!validMonth(archive.historyThrough) || archive.historyThrough >= archive.cutoverMonth) {
     throw new Error('歷史截止月份必須早於正式記帳月份');
   }
+  if (archive.migratedThrough !== undefined && archive.migratedThrough !== archive.historyThrough) throw new Error('歷史轉入記帳的月份與歷史截止月份不同');
   validateHistory(archive.data);
   if (JSON.stringify(Object.keys(archive.data).sort()) !== JSON.stringify([...archive.years].sort())) throw new Error('歷史年度清單與資料不一致');
 }

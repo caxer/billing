@@ -89,7 +89,7 @@ function allYears() {
 
 function monthsFor(target) {
   if (!monthCache.has(target)) monthCache.set(target,
-    billing.annualReport(target, records, archive?.data, archive?.cutoverMonth, context.settings()?.billingGroups, billing.historyEnd(archive)));
+    billing.annualReport(target, records, archive?.data, billing.reportCutoff(archive), context.settings()?.billingGroups, billing.historyEnd(archive)));
   return monthCache.get(target);
 }
 
@@ -116,7 +116,7 @@ function draw() {
   status.textContent = error ? `${error}，按右上角同步重試` : !initialized ? '讀取中…' : '';
   status.hidden = !status.textContent;
   root.querySelector('#billing-year').title = [lastSync && `同步於 ${lastSync.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
-    archive && `歷史月結至 ${billing.historyEnd(archive)} · 正式記帳 ${archive.cutoverMonth} 起`].filter(Boolean).join(' · ');
+    archive && (archive.migratedThrough ? `歷史月結已轉入記帳（${archive.years[0]}-01～${archive.migratedThrough}）` : `歷史月結至 ${billing.historyEnd(archive)} · 正式記帳 ${archive.cutoverMonth} 起`)].filter(Boolean).join(' · ');
   const content = root.querySelector('#billing-content');
   if (!initialized) { content.innerHTML = '<div class="card"><p class="empty">尚未載入</p></div>'; return; }
   const expanded = new Set([...content.querySelectorAll('details[open]')].map((el) => el.id));
@@ -146,6 +146,8 @@ function summaryTiles(totals, label, previous) {
 }
 
 const signed = (n) => `${n > 0 ? '+' : '−'}${money(Math.abs(n))}`;
+/** 轉入記帳後的結餘調整：第一個月是期初結餘，之後是原表結餘與推算的差。 */
+const adjustBadge = (m) => m.adjust ? `<small${m.diff ? ' class="is-expense"' : ''} title="${esc(m.adjust.note || '結餘調整')}">${m.diff ? '差' : '期初'} ${signed(m.adjust.amount)}</small>` : '';
 
 function utilityBudgetView({ expense: spent, missing }) {
   const limit = billing.utilityBudget(context.settings(), year);
@@ -158,7 +160,7 @@ function utilityBudgetView({ expense: spent, missing }) {
   </div>`;
 }
 
-const ledgerSource = () => ({ history: archive?.data, cutoff: archive?.cutoverMonth, historyThrough: billing.historyEnd(archive),
+const ledgerSource = () => ({ history: archive?.data, cutoff: billing.reportCutoff(archive), historyThrough: billing.historyEnd(archive),
   records, mappings: context.settings()?.billingGroups, through: monthKey() });
 const sourceTitle = (m) => m.source === 'history' ? '歷史月結' : m.source === 'missing' ? '缺少歷史' : '即時記帳';
 
@@ -184,7 +186,7 @@ function fundView() {
     ${gaps.length ? `<p class="report-notice fund-gaps" title="公赤盈＋婆赤盈應等於額度合計－月消費總額">赤盈不符：${gaps.map((m) => `${Number(m.month.slice(5))} 月 ${signed(m.settlement.gap)}`).join('、')}</p>` : ''}
     <div class="card"><h3 class="section-title">${year} 公積金帳</h3>
       <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動公積金帳"><table class="report-table fund-table"><thead><tr><th scope="col">月份</th>${billing.FUND_SHARES.map((name, i) => `<th scope="col" title="${esc(members[i] || name)}：額度，小字為額外加入或結餘">${name}</th>`).join('')}${billing.FUND_ITEMS.map((k) => `<th scope="col">${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
-        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th>${m.shares.map((sh) => shareCell(m, sh)).join('')}${billing.FUND_ITEMS.map((k) => `<td>${m.expenses ? (m.expenses[k] ? money(m.expenses[k]) : '') : '—'}</td>`).join('')}<td>${amount(m.balance)}${m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.balance - m.income + m.expense)}，前期推算 ${money(m.balance - m.income + m.expense - m.diff)}">差 ${signed(m.diff)}</small>` : ''}${m.settlement?.gap ? `<small class="is-expense" title="公赤盈＋婆赤盈 ${money(m.settlement.amounts[0] + m.settlement.amounts[1])}，額度－月消費總額 ${money(m.settlement.expected)}">赤盈 ${signed(m.settlement.gap)}</small>` : ''}</td></tr>`).join('')}
+        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th>${m.shares.map((sh) => shareCell(m, sh)).join('')}${billing.FUND_ITEMS.map((k) => `<td>${m.expenses ? (m.expenses[k] ? money(m.expenses[k]) : '') : '—'}</td>`).join('')}<td>${amount(m.balance)}${m.adjust ? adjustBadge(m) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.balance - m.income + m.expense)}，前期推算 ${money(m.balance - m.income + m.expense - m.diff)}">差 ${signed(m.diff)}</small>` : ''}${m.settlement?.gap ? `<small class="is-expense" title="公赤盈＋婆赤盈 ${money(m.settlement.amounts[0] + m.settlement.amounts[1])}，額度－月消費總額 ${money(m.settlement.expected)}">赤盈 ${signed(m.settlement.gap)}</small>` : ''}</td></tr>`).join('')}
         <tr class="report-total"><th scope="row">合計</th>${billing.FUND_SHARES.map((_, i) => `<td>${money(summary.months.reduce((s, m) => s + m.shares[i].quota + m.shares[i].extras.reduce((t, e) => t + e.amount, 0), 0))}</td>`).join('')}${billing.FUND_ITEMS.map((k) => `<td>${money(summary.months.reduce((s, m) => s + (m.expenses?.[k] || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
       </tbody></table></div></div>`;
 }
@@ -204,7 +206,7 @@ function bankView() {
     ${diffs.length ? `<p class="report-notice bank-diffs" title="原表年初結餘與前期推算的餘額不同，之後餘額以原表為準">結餘不符：${diffs.map((m) => `${m.month} ${signed(m.diff)}`).join('、')}</p>` : ''}
     <div class="card"><h3 class="section-title">${year} 土銀帳</h3>
       <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動土銀帳"><table class="report-table bank-table"><thead><tr><th scope="col">月份</th><th scope="col" title="結餘是對帳點，不算入款">入款</th>${items.map((k) => `<th scope="col">${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
-        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th><td${incomeTip(m) ? ` title="${esc(incomeTip(m))}"` : ''}>${cell(m, m.income)}${m.opening ? `<small>結餘 ${money(m.opening.amount)}</small>` : ''}</td>${items.map((k) => `<td>${cell(m, m.expenses[k])}</td>`).join('')}<td>${amount(m.balance)}${m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.opening.amount)}，前期推算 ${money(m.opening.amount - m.diff)}">差 ${signed(m.diff)}</small>` : ''}</td></tr>`).join('')}
+        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th><td${incomeTip(m) ? ` title="${esc(incomeTip(m))}"` : ''}>${cell(m, m.income)}${m.opening ? `<small>結餘 ${money(m.opening.amount)}</small>` : ''}</td>${items.map((k) => `<td>${cell(m, m.expenses[k])}</td>`).join('')}<td>${amount(m.balance)}${m.adjust ? adjustBadge(m) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.opening.amount)}，前期推算 ${money(m.opening.amount - m.diff)}">差 ${signed(m.diff)}</small>` : ''}</td></tr>`).join('')}
         <tr class="report-total"><th scope="row">合計</th><td>${money(summary.income)}</td>${items.map((k) => `<td>${money(summary.months.reduce((s, m) => s + (m.expenses[k] || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
       </tbody></table></div></div>`;
 }

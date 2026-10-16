@@ -1,5 +1,5 @@
 // 月結的純計算與分類對應；歷史合計與新交易永遠擇一使用。
-import { shiftMonth, seriesStats } from './calc.js';
+import { shiftMonth, seriesStats, isAdjustment } from './calc.js';
 export const GROUPS = ['日常', '房', '女兒', '兒子', '水電氣'];
 export const STACK_GROUPS = [
   { key: 'utilities', name: '水電氣', color: '#38bdf8' },
@@ -16,6 +16,8 @@ const ITEMS = {
 };
 /** 水電氣由土銀帳戶扣款，記在土銀名下；它不是手機使用者，也沒有額度。 */
 export const UTILITY_PAYER = '土銀';
+/** 歷史轉入的房、女兒、兒子與日常由公積金支付，記在公積金名下。 */
+export const FUND_PAYER = '公積金';
 /** 土銀某年的水電氣預算，存在 budgets.土銀.<年>；沒設定回傳 0。 */
 export const utilityBudget = (settings, year) =>
   Number(settings?.budgets?.[UTILITY_PAYER]?.[year] ?? settings?.budgets?.[UTILITY_PAYER]?.default ?? 0);
@@ -24,6 +26,9 @@ export const monthlyBudget = (settings, person, month) =>
   Number(settings?.budgets?.[person]?.[month] ?? settings?.budgets?.[person]?.default ?? 0);
 export const BILLING_CATEGORIES = Object.entries(ITEMS).flatMap(([group, items]) => items.map((item) => `${group}／${item}`));
 export const validMonth = (value) => /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value || '');
+
+/** 歷史已轉成交易後，月結全部改讀交易；否則截止月以前讀歷史月結。 */
+export const reportCutoff = (archive) => validMonth(archive?.migratedThrough) ? null : archive?.cutoverMonth;
 
 export const historyEnd = (archive) => archive?.historyThrough ||
   (validMonth(archive?.cutoverMonth) ? shiftMonth(archive.cutoverMonth, -1) : null);
@@ -58,6 +63,7 @@ export function transactionSummary(items, mappings = {}) {
   const details = new Map();
   const incomes = new Map();
   for (const it of items) {
+    if (isAdjustment(it)) continue;
     if (it.type === 'income') {
       result.income += it.amount;
       const detail = incomes.get(it.category) || { group: '收入', item: it.category, amount: 0, note: '' };
@@ -199,11 +205,15 @@ function* ledgerMonths({ history, cutoff, historyThrough, through }) {
  * 歷史月份取原表水電氣列；之後（含待補月份）取記在土銀名下的交易，水電氣以外的支出歸「其他」。
  * 原表每年把上年結餘記成收入，這裡當對帳點：diff 是原表結餘減前期推算，之後以原表數字為準。
  */
+/** 結餘調整交易的帶號合計：收入加、支出減。 */
+const addAdjust = (adjust, it) => ({ amount: (adjust?.amount || 0) + (it.type === 'income' ? it.amount : -it.amount),
+  note: [adjust?.note, it.note].filter(Boolean).join('、') });
+
 export function bankLedger({ history = {}, cutoff, historyThrough, records = {}, mappings = {}, through }) {
   const ledger = [];
   let balance = 0, started = false;
   for (const { month, fromHistory, rows, index } of ledgerMonths({ history, cutoff, historyThrough, through })) {
-    const entry = { month, source: fromHistory ? 'history' : 'transactions', opening: null, incomes: [], expenses: Object.fromEntries(BANK_ITEMS.map((k) => [k, 0])), diff: null };
+    const entry = { month, source: fromHistory ? 'history' : 'transactions', opening: null, adjust: null, incomes: [], expenses: Object.fromEntries(BANK_ITEMS.map((k) => [k, 0])), diff: null };
     if (fromHistory) {
       if (!rows) {
         ledger.push({ ...entry, source: 'missing', income: null, expense: null, balance: null });
@@ -222,6 +232,7 @@ export function bankLedger({ history = {}, cutoff, historyThrough, records = {},
     } else {
       for (const it of records[month] || []) {
         if (it.by !== UTILITY_PAYER) continue;
+        if (isAdjustment(it)) { entry.adjust = addAdjust(entry.adjust, it); continue; }
         if (it.type === 'income') entry.incomes.push({ amount: it.amount, note: it.note || it.category });
         if (it.type !== 'expense') continue;
         const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
@@ -234,6 +245,10 @@ export function bankLedger({ history = {}, cutoff, historyThrough, records = {},
       balance = entry.opening.amount;
     }
     started ||= !!entry.opening;
+    if (entry.adjust) {
+      if (ledger.length) entry.diff = entry.adjust.amount;
+      if (balance !== null) balance += entry.adjust.amount;
+    }
     entry.income = entry.incomes.reduce((s, i) => s + i.amount, 0);
     entry.expense = BANK_ITEMS.reduce((s, k) => s + entry.expenses[k], 0);
     if (balance !== null) balance += entry.income - entry.expense;
@@ -253,7 +268,7 @@ export function fundLedger({ history = {}, cutoff, historyThrough, records = {},
   let balance = 0;
   for (const { month, fromHistory, rows, index } of ledgerMonths({ history, cutoff, historyThrough, through })) {
     const shares = FUND_SHARES.map((name, i) => ({ name, member: members[i] || null, quota: 0, extras: [], carry: null }));
-    const entry = { month, source: fromHistory ? 'history' : 'transactions', shares, expenses: null, settlement: null, diff: null };
+    const entry = { month, source: fromHistory ? 'history' : 'transactions', shares, expenses: null, settlement: null, adjust: null, diff: null };
     if (fromHistory && !rows) {
       ledger.push({ ...entry, source: 'missing', income: null, expense: null, balance: null });
       balance = null;
@@ -281,10 +296,11 @@ export function fundLedger({ history = {}, cutoff, historyThrough, records = {},
       }
     } else {
       const items = (records[month] || []).filter((it) => it.by !== UTILITY_PAYER);
+      for (const it of items.filter(isAdjustment)) entry.adjust = addAdjust(entry.adjust, it);
       for (const share of shares) {
         if (!share.member) continue;
         share.quota = quotaFor(share.member, month);
-        share.extras = items.filter((it) => it.type === 'income' && it.by === share.member).map((it) => ({ amount: it.amount, note: it.note || it.category }));
+        share.extras = items.filter((it) => it.type === 'income' && it.by === share.member && !isAdjustment(it)).map((it) => ({ amount: it.amount, note: it.note || it.category }));
       }
       const t = transactionSummary(items, mappings);
       // 自己付的水電氣不經土銀，跟日常一起由公積金支付。
@@ -295,6 +311,10 @@ export function fundLedger({ history = {}, cutoff, historyThrough, records = {},
       const amount = carries.reduce((sum, sh) => sum + sh.carry.amount, 0);
       if (balance !== null) entry.diff = amount - balance;
       balance = amount;
+    }
+    if (entry.adjust) {
+      if (ledger.length) entry.diff = entry.adjust.amount;
+      if (balance !== null) balance += entry.adjust.amount;
     }
     entry.income = shares.reduce((sum, sh) => sum + sh.quota + sh.extras.reduce((s, e) => s + e.amount, 0), 0);
     entry.expense = entry.expenses && FUND_ITEMS.reduce((sum, k) => sum + entry.expenses[k], 0);

@@ -49,13 +49,18 @@ export function filterItems(items, { query = '', type = '', by = '' } = {}) {
   });
 }
 
-const ofType = (items, type) => items.filter((it) => it.type === type);
+/** 歷史轉入的帳戶結餘調整：讓土銀與公積金餘額對上原表，不算收支。 */
+export const ADJUSTMENT = '結餘調整';
+export const isAdjustment = (it) => it.category === ADJUSTMENT;
+
+const ofType = (items, type) => items.filter((it) => it.type === type && !isAdjustment(it));
 
 /** 支出、收入、淨額（收入 − 支出）。 */
 export function summarize(items) {
   let expense = 0;
   let income = 0;
   for (const it of items) {
+    if (isAdjustment(it)) continue;
     if (it.type === 'expense') expense += it.amount;
     if (it.type === 'income') income += it.amount;
   }
