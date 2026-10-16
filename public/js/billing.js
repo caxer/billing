@@ -387,6 +387,33 @@ export function bankYear(ledger, year) {
     balance: months.at(-1)?.balance ?? null, missing: months.length - known.length };
 }
 
+/**
+ * 一段期間的占比：大項（月結口徑，公積金收入抵扣日常）、支出分類、日常內容排行。
+ * 內容排行依備註合計，同樣的店或品項（例如全聯）合在一起；沒寫備註的不列。
+ */
+export function shareSummary(items, mappings = {}, top = 10, by = 'amount') {
+  const summary = transactionSummary(items, mappings);
+  const groups = STACK_GROUPS.map((g) => ({ name: g.name, color: g.color, amount: summary[g.key] }))
+    .filter((g) => g.amount).sort((a, b) => b.amount - a.amount);
+  const categories = new Map(), notes = new Map();
+  for (const it of items) {
+    if (it.type !== 'expense' || isAdjustment(it)) continue;
+    categories.set(it.category, (categories.get(it.category) || 0) + it.amount);
+    const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
+    const note = String(it.note || '').trim();
+    if (group !== '日常' || !note) continue;
+    const entry = notes.get(note) || { name: note, amount: 0, count: 0 };
+    entry.amount += it.amount;
+    entry.count++;
+    notes.set(note, entry);
+  }
+  return {
+    total: summary.total, groups,
+    categories: [...categories].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
+    top: [...notes.values()].sort((a, b) => (by === 'count' ? b.count - a.count : 0) || b.amount - a.amount).slice(0, top),
+  };
+}
+
 export function reportTotals(months) {
   const keys = ['daily', 'house', 'daughter', 'son', 'utilities', 'monthlyTotal', 'total'];
   return Object.fromEntries(keys.map((key) => [key, months.some((m) => m.source === 'missing' || m.source === 'pending' || m[key] == null)
