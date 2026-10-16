@@ -353,6 +353,11 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
    min-content 比其他瀏覽器大，不鎖住就會把整欄推出卡片。 */
 .field { display: grid; gap: 6px; min-width: 0; }
 .field-label { font-size: 13px; color: var(--muted); }
+.ai-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.ai-tools .btn-quiet { gap: 6px; }
+.ai-tools svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ai-tools [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.ai-status { margin: -4px 2px 0; font-size: 13px; color: var(--muted); }
 .auto-badge { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; }
 
 input[type="text"], input[type="search"], input[type="password"], input[type="date"], input[type="number"], select, textarea {

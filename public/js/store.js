@@ -19,6 +19,7 @@ export const isLocal = () =>
   ['127.0.0.1', 'localhost'].includes(location.hostname);
 
 let session = null; // { owner, repo, branch, token }，只放記憶體
+let apiKey = null; // Claude API key（選用），只放記憶體
 
 function validSession(value) {
   return value && ['owner', 'repo', 'token'].every((key) => typeof value[key] === 'string' && value[key].trim()) &&
@@ -57,10 +58,23 @@ export async function unlock(key) {
   const unlocked = JSON.parse(await LinkKey.openAny(key, box.slots, SECRET_CONTEXT));
   if (!validSession(unlocked)) throw new Error('登入設定格式錯誤');
   session = normalizeDataCredentials(unlocked);
+  apiKey = typeof unlocked.apiKey === 'string' && unlocked.apiKey.startsWith('sk-ant-') ? unlocked.apiKey : null;
+}
+
+/** Claude API key；本機模式向本機伺服器要 local/credentials.json 裡的 key。沒有設定時回傳 null。 */
+export async function aiKey() {
+  if (!isLocal()) return apiKey;
+  if (apiKey) return apiKey;
+  try {
+    const res = await fetch('/api/local-ai', { cache: 'no-store' });
+    if (res.ok) apiKey = (await res.json()).apiKey || null;
+  } catch { /* 本機沒有設定 AI */ }
+  return apiKey;
 }
 
 export function lock() {
   session = null;
+  apiKey = null;
 }
 
 /* ---------- 底層讀寫 ---------- */

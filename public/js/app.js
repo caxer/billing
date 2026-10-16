@@ -9,6 +9,8 @@ import { readStored, writeStored, removeStored } from './storage.js';
 import { classify, GROUPS, UTILITY_PAYER, FUND_PAYER, guessCategory } from './billing.js';
 import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
+import * as ai from './ai.js';
+import { preparePhoto } from './photo.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -244,11 +246,134 @@ function guessFromNote() {
   if (categoryTouched || editingId) return;
   const select = $('#add-category');
   const guess = guessCategory($('#add-note').value, addType, [...state.allItems(), ...prevItems], settings.categories(addType));
+  $('#add-category-auto').textContent = '自動';
   $('#add-category-auto').hidden = !guess;
   if (!guess || guess === select.value) return;
   select.value = guess;
   updateCategoryHint();
   applyUtilityPayer();
+}
+
+/* ---------- AI 記帳：分類、語音、拍收據 ---------- */
+
+const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
+let aiBusy = false, aiCategoryRun = 0, listening = null;
+
+function renderAiTools() {
+  $('#ai-tools').hidden = !ai.available();
+  $('#ai-voice').hidden = !Recognition;
+}
+
+function aiStatus(text) {
+  $('#ai-status').textContent = text;
+  $('#ai-status').hidden = !text;
+}
+
+/** 給 Claude 的參考：可選分類、今天日期、本月與上月最近 60 個不同內容的分類。 */
+function aiContext() {
+  const seen = new Set(), history = [];
+  for (const it of calc.byDateDesc([...state.allItems(), ...prevItems])) {
+    const note = (it.note || '').trim();
+    if (!note || seen.has(note) || ['結餘調整', '與原表差額'].includes(it.category)) continue;
+    seen.add(note);
+    history.push({ note, category: it.category });
+    if (history.length >= 60) break;
+  }
+  return { categories: { expense: settings.categories('expense'), income: settings.categories('income') }, history, today: calc.todayKey() };
+}
+
+function markAi(category) {
+  const select = $('#add-category');
+  if (![...select.options].some((o) => o.value === category)) return false;
+  select.value = category;
+  categoryTouched = false;
+  $('#add-category-auto').textContent = 'AI';
+  $('#add-category-auto').hidden = false;
+  updateCategoryHint();
+  applyUtilityPayer();
+  return true;
+}
+
+/** 關鍵字與以前的紀錄判斷不出來時，離開「內容」欄位後請 Claude 判斷分類。 */
+async function aiCategory() {
+  const note = $('#add-note').value.trim();
+  if (!ai.available() || aiBusy || categoryTouched || editingId || !note || !$('#add-category-auto').hidden) return;
+  const run = ++aiCategoryRun;
+  $('#add-category-auto').textContent = 'AI…';
+  $('#add-category-auto').hidden = false;
+  try {
+    const entry = await ai.parseEntry({ text: note, ...aiContext() });
+    if (run !== aiCategoryRun || categoryTouched || editingId || $('#add-note').value.trim() !== note) return;
+    if (entry.type !== addType && entry.category) setAddType(entry.type);
+    if (!entry.category || !markAi(entry.category)) $('#add-category-auto').hidden = true;
+  } catch (err) {
+    if (run === aiCategoryRun) { $('#add-category-auto').hidden = true; toast(err.message); }
+  }
+}
+
+/** 把 Claude 判斷的一筆填進表單，日期在別的月份就先切過去；不自動送出，讓人確認。 */
+async function fillFromAi(entry) {
+  if (entry.date && calc.validDate(entry.date) && !entry.date.startsWith(month) && !await switchMonth(entry.date.slice(0, 7))) return;
+  setAddType(entry.type);
+  if (entry.amount) $('#add-amount').value = String(entry.amount);
+  if (entry.note) $('#add-note').value = entry.note;
+  if (entry.date && calc.validDate(entry.date) && entry.date.startsWith(month)) setDate(entry.date);
+  if (!entry.category || !markAi(entry.category)) guessFromNote();
+}
+
+async function runAi(request, label) {
+  if (aiBusy || working) return;
+  aiBusy = true;
+  aiCategoryRun++;
+  for (const id of ['#ai-voice', '#ai-photo']) $(id).disabled = true;
+  aiStatus(`${label} · AI 判斷中…`);
+  try {
+    const entry = await ai.parseEntry({ ...request, ...aiContext() });
+    await fillFromAi(entry);
+    aiStatus(`${label} · 已填好，確認後按「記下來」`);
+  } catch (err) {
+    aiStatus('');
+    toast(err.message || 'AI 判斷失敗');
+  } finally {
+    aiBusy = false;
+    for (const id of ['#ai-voice', '#ai-photo']) $(id).disabled = false;
+  }
+}
+
+function toggleVoice() {
+  if (listening) { listening.stop(); return; }
+  const rec = new Recognition();
+  rec.lang = 'zh-TW';
+  rec.interimResults = true;
+  let heard = '', failed = '';
+  rec.onresult = (e) => {
+    heard = [...e.results].map((r) => r[0].transcript).join('');
+    aiStatus(`「${heard}」`);
+  };
+  rec.onerror = (e) => { if (!['aborted', 'no-speech'].includes(e.error)) failed = e.error === 'not-allowed' ? '請允許使用麥克風' : `語音辨識失敗（${e.error}）`; };
+  rec.onend = () => {
+    listening = null;
+    $('#ai-voice').setAttribute('aria-pressed', 'false');
+    $('#ai-voice span').textContent = '說一筆';
+    if (failed) { aiStatus(''); toast(failed); } else if (heard.trim()) runAi({ text: heard.trim() }, `「${heard.trim()}」`);
+    else aiStatus('沒有聽到聲音，再按一次「說一筆」');
+  };
+  listening = rec;
+  $('#ai-voice').setAttribute('aria-pressed', 'true');
+  $('#ai-voice span').textContent = '聆聽中…';
+  aiStatus('請說，例如「昨天全聯三百五」');
+  try { rec.start(); } catch { listening = null; toast('無法開始語音辨識'); }
+}
+
+async function photoChosen(e) {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    aiStatus('處理照片…');
+    const { blob } = await preparePhoto(file);
+    await runAi({ image: { data: await ai.blobToBase64(blob), mediaType: 'image/jpeg' } }, '收據');
+  } catch (err) { aiStatus(''); toast(err.message || '照片處理失敗'); }
 }
 
 /** 分類怎麼計入月結，放在選單的提示裡，不佔版面。 */
@@ -303,6 +428,8 @@ function setDate(value) {
 function resetForm() {
   editingId = null;
   categoryTouched = false;
+  aiCategoryRun++;
+  aiStatus('');
   $('#add-category-auto').hidden = true;
   $('#add-form').reset();
   setDate(month === calc.monthKey() ? calc.todayKey() : `${month}-01`);
@@ -515,6 +642,10 @@ function bind() {
 
   $('#add-form').addEventListener('submit', submitForm);
   $('#add-note').addEventListener('input', guessFromNote);
+  $('#add-note').addEventListener('change', aiCategory);
+  $('#ai-voice').addEventListener('click', toggleVoice);
+  $('#ai-photo').addEventListener('click', () => $('#ai-photo-file').click());
+  $('#ai-photo-file').addEventListener('change', photoChosen);
   $('#add-category').addEventListener('change', () => {
     categoryTouched = true;
     $('#add-category-auto').hidden = true;
@@ -753,6 +884,8 @@ async function start() {
   setSync('busy', '載入中');
   try {
     await settings.load();
+    ai.setKey(await store.aiKey());
+    renderAiTools();
     // 沒選過、或選的人已經不在名單裡，就先問一次再往下走。
     if (!settings.members().includes(me)) {
       me = await askWho();

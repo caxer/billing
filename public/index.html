@@ -69,6 +69,12 @@
       </div>
 
       <form id="add-form" class="card add-form">
+        <div id="ai-tools" class="ai-tools" hidden>
+          <button type="button" class="btn-quiet" id="ai-voice" aria-pressed="false" title="說出一筆帳，例如「昨天全聯三百五」，AI 幫你填好"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>說一筆</span></button>
+          <button type="button" class="btn-quiet" id="ai-photo" title="拍收據或發票，AI 填好金額、日期與內容"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>拍收據</span></button>
+          <input type="file" id="ai-photo-file" accept="image/*" capture="environment" hidden/>
+        </div>
+        <p id="ai-status" class="ai-status" role="status" hidden></p>
         <label class="amount-row">
           <span id="amount-sign" class="amount-sign">−</span>
           <input id="add-amount" type="text" inputmode="numeric" placeholder="0"
