@@ -364,6 +364,12 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .seg.choice .seg-btn { min-height: 40px; padding: 6px 4px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .field:has(.choice), .setting-row:has(.choice) { position: relative; }
 .setting-row .choice { flex: 0 1 auto; min-width: 150px; }
+.same-name { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; }
+.same-name input { width: 18px; height: 18px; accent-color: var(--accent); }
+.filter-chip { margin: 0; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.filter-chip .text-button { min-height: 28px; padding: 2px 8px; }
+.cat-link { cursor: pointer; border-radius: 8px; }
+.cat-link:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .auto-badge { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; }
 
 input[type="text"], input[type="search"], input[type="password"], input[type="date"], input[type="number"], select, textarea {

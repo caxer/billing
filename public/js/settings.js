@@ -28,6 +28,16 @@ export async function load() {
   return current;
 }
 
+/** 重讀雲端設定；內容有變回傳 true。 */
+export async function refresh() {
+  const { settings } = await store.loadSettings();
+  if (!settings) return false;
+  const next = upgradeSettings(settings);
+  if (JSON.stringify(next) === JSON.stringify(current)) return false;
+  current = next;
+  return true;
+}
+
 export function all() {
   return current;
 }

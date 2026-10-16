@@ -1,6 +1,8 @@
 // 月結的純計算與分類對應；歷史合計與新交易永遠擇一使用。
 import { shiftMonth, seriesStats, isAdjustment } from './calc.js';
 export const GROUPS = ['日常', '房', '女兒', '兒子', '水電氣'];
+/** 日常的分類（食衣住行育樂），固定順序。 */
+export const DAILY_ORDER = ['食', '衣', '住', '行', '育', '樂', '醫', '其他'];
 export const STACK_GROUPS = [
   { key: 'utilities', name: '水電氣', color: '#38bdf8' },
   { key: 'house', name: '房', color: '#4ade80' },
@@ -410,8 +412,8 @@ export function shareSummary(items, mappings = {}, top = 10, by = 'amount', pick
     groupTotals.set(group, (groupTotals.get(group) || 0) + it.amount);
     if (GROUPS.includes(pick) ? group !== pick : it.category !== pick) continue;
     topTotal += it.amount;
-    const note = String(it.note || '').trim();
-    if (!note) continue;
+    // 沒寫內容的（例如電費、水費）用分類的項目名稱排行。
+    const note = String(it.note || '').trim() || it.category.split('／').pop();
     const [store, ...rest] = note.split(/\s+/);
     const entry = notes.get(store) || { name: store, amount: 0, count: 0, parts: new Map() };
     entry.amount += it.amount;
@@ -424,9 +426,8 @@ export function shareSummary(items, mappings = {}, top = 10, by = 'amount', pick
     notes.set(store, entry);
   }
   const categoryList = [...categories].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
-  const picks = [...(groupTotals.get('日常') ? ['日常'] : []),
-    ...categoryList.filter((c) => groupOf.get(c.name) === '日常' && !['與原表差額', '扣除列項後開銷'].includes(c.name)).map((c) => c.name),
-    ...GROUPS.filter((g) => g !== '日常' && groupTotals.get(g))];
+  // 日常依食衣住行育樂醫其他的固定順序，再接其他大項。
+  const picks = [...DAILY_ORDER.filter((c) => categories.get(c) && groupOf.get(c) === '日常'), ...GROUPS.filter((g) => g !== '日常' && groupTotals.get(g))];
   return {
     total: summary.total, groups, picks, topTotal,
     categories: categoryList,

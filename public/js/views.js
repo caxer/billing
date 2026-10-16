@@ -193,6 +193,7 @@ export function recordsView(items, filters, people = [], scope = '') {
         <select data-filter="type" data-choices="auto" aria-label="收支"><option value="">全部</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
         <select data-filter="by" data-choices="auto" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
       </div>
+      ${filters.category ? `<p class="filter-chip">分類：${esc(filters.category)} <button type="button" class="text-button" id="record-clear-category" aria-label="取消分類篩選">✕</button></p>` : ''}
       <div class="record-sort"><div class="seg" role="group" aria-label="排序">${sortButtons}</div><button type="button" id="record-clear" class="text-button" title="清除搜尋與篩選">清除</button></div>
       <div id="record-results">${records(items, filters, people, scope)}</div>
     </div>`;

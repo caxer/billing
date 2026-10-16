@@ -40,7 +40,7 @@ let working = false;
 let dataReady = false;
 let unlocking = false;
 let stopWatching = () => {};
-const filters = { query: '', type: '', by: '', sort: 'date', dir: 'desc' };
+const filters = { query: '', type: '', by: '', category: '', sort: 'date', dir: 'desc' };
 
 /* ---------- 部署更新偵測 ---------- */
 
@@ -73,8 +73,15 @@ async function checkVersion() {
   }
 }
 
+/** 回到 App 與開著時每分鐘看一次設定，別支手機或電腦改的分類、記帳人、額度會跟著更新。 */
+async function syncSettings() {
+  if (!dataReady || working || document.visibilityState === 'hidden') return;
+  try { if (await settings.refresh()) { refreshFormOptions(); render(); } } catch { /* 斷網下次再試 */ }
+}
+setInterval(syncSettings, 60000);
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') checkVersion();
+  if (document.visibilityState === 'visible') { checkVersion(); syncSettings(); }
 });
 
 /** 還沒決定這支手機是誰時問一次；不問的話所有裝置都會落到名單第一個人。 */
@@ -431,6 +438,9 @@ function setDate(value) {
 
 function resetForm() {
   editingId = null;
+  sameRecords = [];
+  $('#add-same').hidden = true;
+  $('#add-same-all').checked = false;
   categoryTouched = false;
   aiCategoryRun++;
   aiStatus('');
@@ -452,11 +462,11 @@ let allLoading = null;
 
 /** 沒有關鍵字列本月；有關鍵字搜尋全部月份（本月用最新的狀態）。 */
 function recordPool() {
-  if (!filters.query.trim()) { allLoading = null; return { items: state.allItems(), scope: '' }; }
+  if (!filters.query.trim() && !filters.category) { allLoading = null; return { items: state.allItems(), scope: '' }; }
   if (!allLoading) {
     allLoading = reports.loadAll().then((ok) => {
       if (!ok) allLoading = null;
-      if (view === 'records' && filters.query.trim()) refreshRecordResults();
+      if (view === 'records' && (filters.query.trim() || filters.category)) refreshRecordResults();
     });
   }
   const all = { ...reports.allRecords(), [month]: state.allItems() };
@@ -477,6 +487,53 @@ async function openRecord(id) {
   if (found && await switchMonth(found.date.slice(0, 7))) editRecord(id);
 }
 
+/* ---------- 同名一起改 ---------- */
+
+let sameRecords = [];
+
+/** 找全部時段裡同名（同收支）的其他紀錄；有的話顯示「一起改」。 */
+async function findSameName(item) {
+  sameRecords = [];
+  $('#add-same').hidden = true;
+  $('#add-same-all').checked = false;
+  const note = (item.note || '').trim();
+  if (!note) return;
+  await reports.loadAll();
+  if (editingId !== item.id) return;
+  const all = { ...reports.allRecords(), [month]: state.allItems() };
+  sameRecords = Object.entries(all).flatMap(([m, list]) => list
+    .filter((it) => it.id !== item.id && it.type === item.type && (it.note || '').trim() === note).map((it) => ({ month: m, id: it.id })));
+  if (!sameRecords.length) return;
+  $('#add-same-text').textContent = `同名「${note}」的另外 ${sameRecords.length} 筆，分類和名稱一起改`;
+  $('#add-same').hidden = false;
+}
+
+/** 把這筆改掉的分類或名稱套到同名的其他紀錄（只動分類與名稱，金額日期不動）。 */
+async function applyToSameName(original, payload) {
+  const changes = {};
+  if (payload.category !== original.category) {
+    changes.category = payload.category;
+    if (payload.type === 'expense') changes.billingGroup = payload.billingGroup;
+  }
+  if (payload.note !== (original.note || '')) changes.note = payload.note;
+  if (!Object.keys(changes).length) return 0;
+  const byMonth = new Map();
+  for (const r of sameRecords) byMonth.set(r.month, [...(byMonth.get(r.month) || []), r.id]);
+  let done = 0, i = 0;
+  for (const [m, ids] of byMonth) {
+    setSync('busy', `一起改 ${++i}/${byMonth.size}`);
+    const set = new Set(ids);
+    await state.mutateMonth(m, (list) => {
+      const hits = list.filter((it) => set.has(it.id));
+      if (!hits.length) return false;
+      for (const it of hits) Object.assign(it, changes);
+      done += hits.length;
+    });
+  }
+  reports.refresh();
+  return done;
+}
+
 function editRecord(id) {
   if (working) return;
   const item = state.allItems().find((it) => it.id === id);
@@ -492,6 +549,7 @@ function editRecord(id) {
   $('#add-cancel').hidden = false;
   $('#add-delete').hidden = false;
   show('add');
+  findSameName(item);
 }
 
 async function submitForm(event) {
@@ -526,8 +584,10 @@ async function submitForm(event) {
   $('#add-submit').textContent = '儲存中…';
   try {
     if (editingId) {
+      const original = structuredClone(state.allItems().find((it) => it.id === editingId));
       if (!await state.update(editingId, payload)) throw new Error('這筆紀錄已被刪除，請重新整理後確認');
-      toast('已更新');
+      const together = $('#add-same-all').checked && sameRecords.length ? await applyToSameName(original, payload) : 0;
+      toast(together ? `已更新，同名的 ${together} 筆一起改` : '已更新');
     } else {
       await state.add(payload);
       toast(`已記下 ${payload.type === 'income' ? '+' : '−'}${calc.money(payload.amount)}`);
@@ -725,9 +785,10 @@ function bind() {
 
   $('#view-records').addEventListener('click', (e) => {
     if (e.target.closest('#record-clear')) {
-      Object.assign(filters, { query: '', type: '', by: '' });
+      Object.assign(filters, { query: '', type: '', by: '', category: '' });
       return render();
     }
+    if (e.target.closest('#record-clear-category')) { filters.category = ''; return render(); }
     const sort = e.target.closest('[data-sort]');
     if (sort) {
       // 再按一次目前的排序就反轉方向。
@@ -949,7 +1010,9 @@ async function boot() {
   applyTheme();
   bind();
   bindSettings();
-  reports.init($('#view-billing'), { settings: () => settings.all(), sync: (next, label) => setSync(next, label, 'billing') });
+  reports.init($('#view-billing'), { settings: () => settings.all(), sync: (next, label) => setSync(next, label, 'billing'),
+    // 占比點名稱或分類：到明細搜尋全部時段。
+    search: (query, category = '') => { Object.assign(filters, { query, category, type: '', by: '' }); show('records'); } });
   state.onChange(() => {
     reports.updateMonth(state.currentMonth(), state.allItems());
     if (!working) render();

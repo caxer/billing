@@ -39,11 +39,12 @@ export function parseAmount(value) {
   return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 }
 
-export function filterItems(items, { query = '', type = '', by = '' } = {}) {
+export function filterItems(items, { query = '', type = '', by = '', category = '' } = {}) {
   const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   return items.filter((it) => {
     if (type && it.type !== type) return false;
     if (by && it.by !== by) return false;
+    if (category && it.category !== category) return false;
     const text = [it.note, it.category, it.by, it.date, it.amount].join(' ').toLocaleLowerCase();
     return words.every((word) => text.includes(word));
   });
