@@ -190,8 +190,8 @@ export function recordsView(items, filters, people = []) {
     <div class="stack records-section">
       <div class="record-filters">
         <input id="record-query" class="search-field" type="search" data-filter="query" aria-label="搜尋紀錄" placeholder="搜尋內容、分類、日期、金額" value="${esc(filters.query || '')}" autocomplete="off"/>
-        <select data-filter="type" aria-label="收支"><option value="">全部收支</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
-        <select data-filter="by" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
+        <select data-filter="type" data-choices="auto" aria-label="收支"><option value="">全部</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
+        <select data-filter="by" data-choices="auto" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
       </div>
       <div class="record-sort"><div class="seg" role="group" aria-label="排序">${sortButtons}</div><button type="button" id="record-clear" class="text-button" title="清除搜尋與篩選">清除</button></div>
       <div id="record-results">${records(items, filters, people)}</div>
@@ -219,11 +219,11 @@ export function settings(ctx) {
       <div class="card">
         <div class="setting-row">
           <div class="setting-name" title="記帳時預設選這個人">這支手機是</div>
-          <select id="set-me" aria-label="這支手機的預設記帳人" style="max-width:150px">${members.map((p) => `<option ${p === me ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
+          <select id="set-me" data-choices="auto" aria-label="這支手機的預設記帳人" style="max-width:150px">${members.map((p) => `<option ${p === me ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>
         </div>
         <div class="setting-row">
           <div class="setting-name">外觀</div>
-          <select id="set-theme" aria-label="外觀" style="max-width:150px">
+          <select id="set-theme" data-choices="auto" aria-label="外觀" style="max-width:150px">
             <option value="auto" ${theme === 'auto' ? 'selected' : ''}>跟隨系統</option>
             <option value="light" ${theme === 'light' ? 'selected' : ''}>亮色</option>
             <option value="dark" ${theme === 'dark' ? 'selected' : ''}>深色</option>
@@ -261,7 +261,7 @@ export function settings(ctx) {
         <div class="tag-list" id="cats-expense">${catTags(expenseCats, 'expense')}</div></details>
         <div class="add-cat-row">
           <input id="new-cat-expense" type="text" placeholder="新增支出分類" enterkeyhint="done"/>
-          <select id="new-cat-group" aria-label="歸在哪個大項" title="房、女兒、兒子從月消費總額分列；日常歸在扣除列項後開銷；水電氣另計">${GROUPS.map((g) => `<option>${g}</option>`).join('')}</select>
+          <select id="new-cat-group" data-choices="auto" aria-label="歸在哪個大項" title="房、女兒、兒子從月消費總額分列；日常歸在扣除列項後開銷；水電氣另計">${GROUPS.map((g) => `<option>${g}</option>`).join('')}</select>
           <button type="button" class="btn-quiet" data-add-cat="expense">新增</button>
         </div>
       </div>

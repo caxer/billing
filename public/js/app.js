@@ -11,6 +11,7 @@ import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
 import * as ai from './ai.js';
 import { preparePhoto } from './photo.js';
+import { asButtons, enhance } from './choices.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -177,6 +178,7 @@ function render() {
     const active = document.activeElement;
     const selection = active?.id === 'record-query' ? [active.selectionStart, active.selectionEnd] : null;
     $('#view-records').innerHTML = views.recordsView(state.allItems(), filters, settings.people());
+    enhance($('#view-records'));
     if (selection) {
       const input = $('#record-query');
       input.focus({ preventScroll: true });
@@ -209,6 +211,7 @@ function renderSettings() {
     budgets: all.budgets || {},
     isLocal: store.isLocal(),
   });
+  enhance($('#view-settings'));
   for (const id of opened) { const el = document.getElementById(id); if (el) el.open = true; }
 }
 
@@ -641,6 +644,7 @@ function bind() {
   $('#add-date').addEventListener('change', (e) => setDate(e.target.value));
 
   $('#add-form').addEventListener('submit', submitForm);
+  asButtons($('#add-by'));
   $('#add-note').addEventListener('input', guessFromNote);
   $('#add-note').addEventListener('change', aiCategory);
   $('#ai-voice').addEventListener('click', toggleVoice);
