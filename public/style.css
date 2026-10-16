@@ -533,9 +533,11 @@ select { padding-right: 34px; }
 .report-controls .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .share-scope { margin: 0 0 6px; }
 .share-top { margin: 0; gap: 4px; }
+.share-picks { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.share-picks .chip { font-size: 13px; min-height: 34px; padding: 4px 12px; }
+.share-picks .chip.is-on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 .share-top .seg-btn { min-height: 34px; padding: 4px 12px; font-size: 13px; }
 .share-count { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
-.share-more summary { padding: 8px 0; color: var(--muted); font-size: 13px; cursor: pointer; }
 .report-controls .seg-btn { padding: 10px 6px; font-size: 13px; white-space: nowrap; }
 .report-controls .field { margin: 0; }
 .year-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: center; }

@@ -390,19 +390,25 @@ export function bankYear(ledger, year) {
 /**
  * 一段期間的占比：大項（月結口徑，公積金收入抵扣日常）、支出分類、日常內容排行。
  * 內容排行依備註空格前的第一個詞（店名）合計，例如「7-11」「7-11 早餐」都算 7-11，
- * 空格後的品項列在 parts；沒寫備註的不列。
+ * 空格後的品項列在 parts；沒寫備註的不列。pick 是要排行的大項（日常、房…）或單一分類（餐飲、採買…）；
+ * picks 是期間內有支出的選項：日常、日常底下的分類、其他大項。
  */
-export function shareSummary(items, mappings = {}, top = 10, by = 'amount') {
+export function shareSummary(items, mappings = {}, top = 10, by = 'amount', pick = '日常') {
   const summary = transactionSummary(items, mappings);
   const groups = STACK_GROUPS.map((g) => ({ name: g.name, color: g.color, amount: summary[g.key] }))
     .filter((g) => g.amount).sort((a, b) => b.amount - a.amount);
-  const categories = new Map(), notes = new Map();
+  const categories = new Map(), notes = new Map(), groupOf = new Map(), groupTotals = new Map();
+  let topTotal = 0;
   for (const it of items) {
     if (it.type !== 'expense' || isAdjustment(it)) continue;
     categories.set(it.category, (categories.get(it.category) || 0) + it.amount);
     const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
+    groupOf.set(it.category, group);
+    groupTotals.set(group, (groupTotals.get(group) || 0) + it.amount);
+    if (GROUPS.includes(pick) ? group !== pick : it.category !== pick) continue;
+    topTotal += it.amount;
     const note = String(it.note || '').trim();
-    if (group !== '日常' || !note) continue;
+    if (!note) continue;
     const [store, ...rest] = note.split(/\s+/);
     const entry = notes.get(store) || { name: store, amount: 0, count: 0, parts: new Map() };
     entry.amount += it.amount;
@@ -414,9 +420,13 @@ export function shareSummary(items, mappings = {}, top = 10, by = 'amount') {
     entry.parts.set(part, sub);
     notes.set(store, entry);
   }
+  const categoryList = [...categories].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+  const picks = [...(groupTotals.get('日常') ? ['日常'] : []),
+    ...categoryList.filter((c) => groupOf.get(c.name) === '日常' && !['與原表差額', '扣除列項後開銷'].includes(c.name)).map((c) => c.name),
+    ...GROUPS.filter((g) => g !== '日常' && groupTotals.get(g))];
   return {
-    total: summary.total, groups,
-    categories: [...categories].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount),
+    total: summary.total, groups, picks, topTotal,
+    categories: categoryList,
     top: [...notes.values()].sort((a, b) => (by === 'count' ? b.count - a.count : 0) || b.amount - a.amount).slice(0, top)
       .map((t) => ({ ...t, parts: [...t.parts.values()].sort((a, b) => (by === 'count' ? b.count - a.count : 0) || b.amount - a.amount) })),
   };
