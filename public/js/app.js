@@ -116,7 +116,7 @@ function setSync(next, label, scope = view === 'billing' ? 'billing' : 'month') 
 function setWorking(value) {
   working = value;
   ui.app.setAttribute('aria-busy', String(value));
-  for (const control of document.querySelectorAll('.tab, [data-go], [data-cat-switch], #month-nav button, #add-form input, #add-form select, #add-form button, #view-add .seg-btn, #view-settings button, #view-settings input, #view-settings select')) {
+  for (const control of document.querySelectorAll('.tab, [data-go], [data-cat-switch], #month-nav button, #month-picker button, #add-form input, #add-form select, #add-form button, #view-add .seg-btn, #view-settings button, #view-settings input, #view-settings select')) {
     control.disabled = value || control.hasAttribute('data-unavailable');
   }
   renderSync();
@@ -158,6 +158,7 @@ function show(next) {
   }
   ui.title.textContent = next === 'add' && editingId ? '編輯紀錄' : TITLES[next];
   ui.monthNav.hidden = next === 'add' || next === 'billing';
+  togglePicker(false);
   reports.setActive(next === 'billing');
   renderSync();
   if (next === 'add' && !editingId && !$('#add-amount').value && !$('#add-note').value) resetForm();
@@ -445,6 +446,28 @@ async function switchMonth(target = month, refreshSettings = false) {
   }
 }
 
+/* ---------- 年月快選 ---------- */
+
+let pickerYear = Number(calc.monthKey().slice(0, 4));
+
+function togglePicker(open = $('#month-picker').hidden) {
+  $('#month-picker').hidden = !open;
+  $('#month-label').setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  pickerYear = Number(month.slice(0, 4));
+  drawPicker();
+  $('#picker-months .is-on')?.focus();
+}
+
+function drawPicker() {
+  const now = calc.monthKey();
+  $('#picker-year').textContent = `${pickerYear} 年`;
+  $('#picker-months').innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const key = `${pickerYear}-${String(i + 1).padStart(2, '0')}`;
+    return `<button type="button" class="seg-btn${key === month ? ' is-on' : ''}${key === now ? ' is-now' : ''}" data-month="${key}" aria-pressed="${key === month}"${key === now ? ' title="本月"' : ''}>${i + 1} 月</button>`;
+  }).join('');
+}
+
 /* ---------- 事件 ---------- */
 
 function bind() {
@@ -454,7 +477,24 @@ function bind() {
 
   $('#month-prev').addEventListener('click', () => switchMonth(calc.shiftMonth(month, -1)));
   $('#month-next').addEventListener('click', () => switchMonth(calc.shiftMonth(month, 1)));
-  $('#month-label').addEventListener('click', () => switchMonth(calc.monthKey()));
+  $('#month-label').addEventListener('click', () => togglePicker());
+  $('#month-picker').addEventListener('click', (e) => {
+    const step = e.target.closest('[data-year-step]');
+    if (step) { pickerYear += Number(step.dataset.yearStep); drawPicker(); return; }
+    const target = e.target.closest('[data-month]')?.dataset.month || (e.target.closest('#picker-today') && calc.monthKey());
+    if (!target) return;
+    togglePicker(false);
+    $('#month-label').focus();
+    if (target !== month) switchMonth(target);
+  });
+  document.addEventListener('click', (e) => {
+    if (!$('#month-picker').hidden && !e.target.closest('#month-picker, #month-label')) togglePicker(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || $('#month-picker').hidden) return;
+    togglePicker(false);
+    $('#month-label').focus();
+  });
   ui.sync.addEventListener('click', () => {
     if (updateReady) { location.reload(); return; }
     switchMonth(month, true);

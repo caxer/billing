@@ -178,6 +178,19 @@ h1, h2, h3 { margin: 0; font-weight: 650; }
 }
 .month-nav button:first-child, .month-nav button:last-child { font-size: 26px; }
 #month-label { font-weight: 600; font-size: 15px; }
+#month-label::after { content: "▾"; color: var(--muted); font-size: 11px; }
+.month-picker {
+  position: absolute; top: 100%; left: 16px; right: 16px; margin-top: 6px;
+  display: grid; gap: 10px; padding: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 12px 32px #0000002e;
+}
+.picker-year { display: flex; align-items: center; justify-content: space-between; }
+.picker-year strong { font-size: 16px; }
+.picker-year .btn-quiet { min-width: var(--tap); font-size: 22px; padding: 4px 12px; }
+.picker-months { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.picker-months .seg-btn { padding: 8px 0; }
+.picker-months .is-now:not(.is-on) { color: var(--accent); border-color: var(--accent); font-weight: 650; }
 
 main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 
@@ -471,6 +484,7 @@ select { padding-right: 34px; }
   .search-field { grid-column: auto; }
   .tabs { border: 1px solid var(--line); border-radius: 18px 18px 0 0; max-width: 560px; overflow: hidden; }
   .month-nav { max-width: 320px; margin: 8px auto 0; }
+  .month-picker { left: 50%; right: auto; width: 320px; transform: translateX(-50%); }
 }
 @media (max-width: 360px) {
   main { padding-left: 12px; padding-right: 12px; }
