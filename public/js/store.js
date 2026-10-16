@@ -146,7 +146,7 @@ function encodeBase64(text) {
 
 const emptyMonth = (month) => ({ month, items: [] });
 
-function validateItems(items, month) {
+export function validateItems(items, month) {
   const ids = new Set();
   if (!Array.isArray(items)) throw new Error(`${month} 的資料格式損毀`);
   for (const it of items) {

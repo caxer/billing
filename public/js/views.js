@@ -78,11 +78,7 @@ function recordRow(it) {
     </button></li>`;
 }
 
-const recordList = (items, limit) => {
-  const list = calc.byDateDesc(items).slice(0, limit ?? items.length);
-  if (!list.length) return `<p class="empty">這個月還沒有紀錄</p>`;
-  return `<ul class="list">${list.map(recordRow).join('')}</ul>`;
-};
+const recordList = (items) => `<ul class="list">${items.map(recordRow).join('')}</ul>`;
 
 /* ---------- 看板 ---------- */
 
@@ -95,27 +91,17 @@ function billingCard(items) {
 }
 
 export function dashboard(month, items, prevItems, people) {
-  const { expense, income, net } = calc.summarize(items);
-  const today = calc.todayKey();
-  const todayExpense = calc.summarize(items.filter((it) => it.date === today && it.type === 'expense')).expense;
+  const { expense, income } = calc.summarize(items);
   const previous = calc.summarize(prevItems);
 
   return `
     <div class="stack dashboard-grid">
-      <div class="tiles">
+      <div class="tiles tiles-2">
         ${tile('本月支出', calc.money(expense), 'is-expense', changeSub(expense, previous.expense))}
         ${tile('本月收入', calc.money(income), 'is-income', changeSub(income, previous.income))}
-        ${tile('淨額', calc.signedMoney(net), net < 0 ? 'is-expense' : 'is-income')}
-      </div>
-      <div class="card today-card">
-        <span class="setting-name">今日支出</span>
-        <span class="row-amount is-expense">${calc.money(todayExpense)}</span>
-        <button type="button" class="btn-primary" data-go="add">＋ 記一筆</button>
       </div>
       ${billingCard(items)}
       ${budgetCard(items, month, people)}
-      <div class="records-section"><div class="section-head"><h2 class="section-title">最近紀錄</h2><button type="button" class="text-button" data-go="stats">全部 →</button></div>
-      ${recordList(items, 5)}</div>
     </div>`;
 }
 
@@ -128,10 +114,9 @@ const stackSeg = (bucket, person, index, stackTotal) => {
   return `<div class="bars-seg" style="height:${(amount / stackTotal) * 100}%;background-color:${personColor(index)}"></div>`;
 };
 
-export function stats(month, items, prevItems, categoryType, filters = {}, people = []) {
-  // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從圖表與篩選消失。
+export function stats(month, items, prevItems, categoryType, people = []) {
+  // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從圖表消失。
   const recordPeople = [...new Set([...people, ...items.map((it) => it.by || '')])];
-  const filterPeople = [...new Set([...recordPeople.filter(Boolean), ...(filters.by ? [filters.by] : [])])];
   const { expense, income, net } = calc.summarize(items);
   const spent = calc.byDay(items, month, 'expense');
   // 只畫支出；收入資料照常記錄，但不在這張圖上呈現。
@@ -192,20 +177,34 @@ export function stats(month, items, prevItems, categoryType, filters = {}, peopl
           </div>`).join('') : `<p class="empty">這個月還沒有紀錄</p>`}
       </div>
 
-      <div class="records-section">
-        <div class="section-head"><h2 class="section-title">全部紀錄</h2><button type="button" id="record-clear" class="text-button">清除</button></div>
-        <div class="record-filters">
-          <input id="record-query" class="search-field" type="search" data-filter="query" aria-label="搜尋紀錄" placeholder="搜尋內容、分類、日期、金額" value="${esc(filters.query || '')}" autocomplete="off"/>
-          <select data-filter="type" aria-label="收支"><option value="">全部收支</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
-          <select data-filter="by" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
-        </div>
-        <div id="record-results">${records(items, filters)}</div>
+    </div>`;
+}
+
+/* ---------- 明細 ---------- */
+
+const SORTS = [['date', '日期', '新到舊', '舊到新'], ['amount', '金額', '大到小', '小到大']];
+
+export function recordsView(items, filters, people = []) {
+  // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從篩選消失。
+  const filterPeople = [...new Set([...people, ...items.map((it) => it.by || ''), filters.by || ''].filter(Boolean))];
+  const sortButtons = SORTS.map(([key, label, desc, asc]) => {
+    const on = (filters.sort || 'date') === key, up = filters.dir === 'asc';
+    return `<button type="button" class="seg-btn ${on ? 'is-on' : ''}" data-sort="${key}" aria-pressed="${on}" title="${on ? `${up ? asc : desc}，再按一次反轉` : desc}">${label}${on ? (up ? ' ↑' : ' ↓') : ''}</button>`;
+  }).join('');
+  return `
+    <div class="stack records-section">
+      <div class="record-filters">
+        <input id="record-query" class="search-field" type="search" data-filter="query" aria-label="搜尋紀錄" placeholder="搜尋內容、分類、日期、金額" value="${esc(filters.query || '')}" autocomplete="off"/>
+        <select data-filter="type" aria-label="收支"><option value="">全部收支</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
+        <select data-filter="by" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
       </div>
+      <div class="record-sort"><div class="seg" role="group" aria-label="排序">${sortButtons}</div><button type="button" id="record-clear" class="text-button" title="清除搜尋與篩選">清除</button></div>
+      <div id="record-results">${records(items, filters)}</div>
     </div>`;
 }
 
 export function records(items, filters) {
-  const found = calc.filterItems(items, filters);
+  const found = calc.sortItems(calc.filterItems(items, filters), filters);
   const totals = calc.summarize(found);
   return `<p class="results-summary" role="status">${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found) : `<p class="empty">${items.length ? '沒有符合的紀錄' : '這個月還沒有紀錄'}</p>`}`;
 }
@@ -284,7 +283,6 @@ export function settings(ctx) {
 
       <div class="setting-actions">
         <button type="button" class="btn-quiet" id="set-export" title="匯出${calc.monthLabel(month)}全部紀錄，可用 Excel 開啟">匯出 CSV</button>
-        <button type="button" class="btn-quiet danger-button" id="set-clear" title="刪掉${calc.monthLabel(month)}全部紀錄，無法復原">清空本月</button>
         ${!isLocal ? `<button type="button" class="btn-quiet" id="set-lock" title="這台裝置下次需要重新點專屬連結">登出此裝置</button>` : ''}
       </div>
     </div>`;

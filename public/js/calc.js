@@ -99,6 +99,13 @@ export function byDay(items, month, type) {
   return buckets;
 }
 
+/** 明細排序：日期或金額，desc 為新到舊／大到小；同值依日期再依建立時間。 */
+export function sortItems(items, { sort = 'date', dir = 'desc' } = {}) {
+  const sign = dir === 'asc' ? -1 : 1;
+  return [...items].sort((a, b) => sign * ((sort === 'amount' ? b.amount - a.amount : 0) ||
+    b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt))));
+}
+
 /** 依日期新到舊排，同一天則後存的排前面。 */
 export function byDateDesc(items) {
   return [...items].sort(

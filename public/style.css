@@ -213,7 +213,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
   width: 100%;
   max-width: 960px;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(8px);
   border-top: 1px solid var(--line);
@@ -233,6 +233,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 /* ---------- 數字卡 ---------- */
 
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tiles-2 { grid-template-columns: repeat(2, 1fr); }
 
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
 .tile-label { font-size: 12px; color: var(--muted); }
@@ -451,8 +452,6 @@ input:focus-visible, select:focus-visible { outline-offset: 1px; }
 select { padding-right: 34px; }
 .view { min-width: 0; }
 .card, .tile { box-shadow: 0 3px 12px #00000004; }
-.today-card { display: flex; align-items: center; gap: 12px; padding-top: 8px; padding-bottom: 8px; }
-.today-card .btn-primary { margin-left: auto; white-space: nowrap; }
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 2px 0 8px; }
 .text-button { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .row-arrow { color: var(--muted); font-size: 22px; }
@@ -463,6 +462,8 @@ select { padding-right: 34px; }
 .chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted); }
 .record-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .search-field { grid-column: 1 / -1; }
+.record-sort { display: flex; align-items: center; gap: 8px; }
+.record-sort .seg { flex: 1; grid-template-columns: 1fr 1fr; margin: 0; }
 .results-summary { margin: 8px 2px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 #view-add { max-width: 620px; margin: auto; }
 #add-cancel-row { grid-template-columns: 1fr 1fr; }
@@ -476,7 +477,7 @@ select { padding-right: 34px; }
   .topbar { padding: 18px 28px 12px; }
   main { padding: 24px 28px 100px; }
   .dashboard-grid, .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
-  .tiles, .today-card, .records-section { grid-column: 1 / -1; }
+  .tiles, .records-section { grid-column: 1 / -1; }
   .tile { padding: 20px; }
   .tile-value { font-size: 30px; margin-top: 6px; }
   .card { padding: 20px; }

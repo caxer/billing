@@ -23,7 +23,7 @@ const ui = {
 
 const loginScreen = initLoginScreen(ui.lock, { onKey: (key) => unlockAccount(key, true) });
 
-const TITLES = { dashboard: '看板', add: '記帳', stats: '統計', billing: '月結', settings: '設定' };
+const TITLES = { dashboard: '看板', add: '記帳', records: '明細', stats: '統計', billing: '月結', settings: '設定' };
 
 let view = 'dashboard';
 let month = calc.monthKey();
@@ -37,7 +37,7 @@ let working = false;
 let dataReady = false;
 let unlocking = false;
 let stopWatching = () => {};
-const filters = { query: '', type: '', by: '' };
+const filters = { query: '', type: '', by: '', sort: 'date', dir: 'desc' };
 
 /* ---------- 部署更新偵測 ---------- */
 
@@ -172,9 +172,11 @@ function render() {
   if (view === 'dashboard') {
     $('#view-dashboard').innerHTML = views.dashboard(month, state.allItems(), prevItems, settings.people());
   } else if (view === 'stats') {
+    $('#view-stats').innerHTML = views.stats(month, state.allItems(), prevItems, categoryType, settings.people());
+  } else if (view === 'records') {
     const active = document.activeElement;
     const selection = active?.id === 'record-query' ? [active.selectionStart, active.selectionEnd] : null;
-    $('#view-stats').innerHTML = views.stats(month, state.allItems(), prevItems, categoryType, filters, settings.people());
+    $('#view-records').innerHTML = views.recordsView(state.allItems(), filters, settings.people());
     if (selection) {
       const input = $('#record-query');
       input.focus({ preventScroll: true });
@@ -278,26 +280,6 @@ function setAddType(type) {
   $('.amount-row').classList.toggle('is-income', type === 'income');
   fillCategories(type);
   applyUtilityPayer();
-}
-
-/** 清掉目前這個月的全部紀錄。連按兩次確認，且不可復原。 */
-async function clearMonthRecords() {
-  const count = state.allItems().length;
-  if (!count) return toast('這個月本來就沒有紀錄');
-  if (!confirm(`確定要清掉 ${calc.monthLabel(month)}的全部 ${count} 筆紀錄？`)) return;
-  if (!confirm('清空後無法復原，確定要繼續？')) return;
-  setWorking(true);
-  setSync('busy', '清空中');
-  try {
-    await state.mutate((list) => { list.length = 0; });
-    setSync('ok', '已清空');
-    toast(`${calc.monthLabel(month)}已清空`);
-  } catch (err) {
-    setSync('error', '清空失敗');
-    toast(err.message || '清空失敗');
-  } finally {
-    setWorking(false);
-  }
 }
 
 /** 日期是透明 input 蓋在按鈕上，每次改值都要同步按鈕上的文字。 */
@@ -525,7 +507,7 @@ function bind() {
 
   $('#view-billing').addEventListener('click', async (e) => {
     if (!e.target.closest('#billing-show-records') || working) return;
-    if (await switchMonth(reports.selectedDetailMonth())) show('stats');
+    if (await switchMonth(reports.selectedDetailMonth())) show('records');
   });
 
   $('#add-cancel').addEventListener('click', () => resetForm());
@@ -555,7 +537,7 @@ function bind() {
   });
 
   for (const event of ['input', 'change']) {
-    $('#view-stats').addEventListener(event, (e) => {
+    $('#view-records').addEventListener(event, (e) => {
       const key = e.target.dataset.filter;
       if (!key || (key === 'query' ? event !== 'input' : event !== 'change')) return;
       filters[key] = e.target.value;
@@ -563,14 +545,23 @@ function bind() {
     });
   }
 
-  $('#view-stats').addEventListener('click', async (e) => {
-    if (e.target.closest('[data-go="billing"]')) return show('billing');
+  $('#view-records').addEventListener('click', (e) => {
     if (e.target.closest('#record-clear')) {
       Object.assign(filters, { query: '', type: '', by: '' });
       return render();
     }
+    const sort = e.target.closest('[data-sort]');
+    if (sort) {
+      // 再按一次目前的排序就反轉方向。
+      filters.dir = filters.sort === sort.dataset.sort && filters.dir === 'desc' ? 'asc' : 'desc';
+      filters.sort = sort.dataset.sort;
+      return render();
+    }
     const row = e.target.closest('.row[data-id]');
-    if (row) return editRecord(row.dataset.id);
+    if (row) editRecord(row.dataset.id);
+  });
+
+  $('#view-stats').addEventListener('click', (e) => {
     const sw = e.target.closest('[data-cat-switch]');
     if (sw) {
       categoryType = sw.dataset.type;
@@ -605,7 +596,6 @@ function bindSettings() {
     const delPersonBtn = e.target.closest('[data-del-person]');
     if (e.target.closest('[data-go="billing"]')) return show('billing');
     if (e.target.closest('#set-export')) return exportCsv();
-    if (e.target.closest('#set-clear')) return clearMonthRecords();
     if (e.target.closest('#set-lock')) {
       if (working || !confirm('移除後，這台裝置要重新點專屬連結才能開啟帳本。確定移除？')) return;
       reports.lock();
