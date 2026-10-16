@@ -116,7 +116,7 @@ function setSync(next, label, scope = view === 'billing' ? 'billing' : 'month') 
 function setWorking(value) {
   working = value;
   ui.app.setAttribute('aria-busy', String(value));
-  for (const control of document.querySelectorAll('.tab, [data-go], [data-cat-switch], #month-nav button, #month-picker button, #add-form input, #add-form select, #add-form button, #view-add .seg-btn, #view-settings button, #view-settings input, #view-settings select')) {
+  for (const control of document.querySelectorAll('.tab, [data-cat-switch], #month-nav button, #month-picker button, #add-form input, #add-form select, #add-form button, #view-add .seg-btn, #view-settings button, #view-settings input, #view-settings select')) {
     control.disabled = value || control.hasAttribute('data-unavailable');
   }
   renderSync();
@@ -553,8 +553,6 @@ function bind() {
   });
 
   $('#view-stats').addEventListener('click', (e) => {
-    const go = e.target.closest('[data-go]');
-    if (go) return show(go.dataset.go);
     const sw = e.target.closest('[data-cat-switch]');
     if (sw) {
       categoryType = sw.dataset.type;
@@ -586,7 +584,6 @@ function bindSettings() {
     const delBtn = e.target.closest('[data-del-cat]');
     const budgetBtn = e.target.closest('[data-budget-person]');
     const renameBtn = e.target.closest('[data-rename-person]');
-    if (e.target.closest('[data-go="billing"]')) return show('billing');
     if (e.target.closest('#set-export')) return exportCsv();
     if (working || (!addBtn && !delBtn && !budgetBtn && !renameBtn)) return;
     const targetMonth = month;

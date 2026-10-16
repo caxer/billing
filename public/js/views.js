@@ -87,7 +87,7 @@ const recordList = (items, colors) => `<ul class="list">${items.map((it) => reco
 
 function billingCard(items) {
   const summary = transactionSummary(items, allSettings()?.billingGroups);
-  return `<div class="card billing-month-card"><div class="section-head"><h2 class="section-title">本月月結</h2><button class="text-button" type="button" data-go="billing">年度 →</button></div>
+  return `<div class="card billing-month-card"><div class="budget-head"><span class="budget-title">本月月結</span></div>
     <div class="billing-mini-grid">${[['月消費總額', summary.monthlyTotal, '含房與子女'], ['扣除列項後開銷', summary.daily, '日常'], ['水電氣', summary.utilities, '另計'], ['家庭總支出', summary.total, '月消費總額＋水電氣']].map(([name, total, tip]) =>
       `<div title="${tip}"><span class="setting-hint">${name}</span><strong>${calc.money(total)}</strong></div>`).join('')}</div>
     <div class="billing-parts">${[['房', summary.house], ['女兒', summary.daughter], ['兒子', summary.son]].map(([name, total]) => `<span>${name} <b>${calc.money(total)}</b></span>`).join('')}</div></div>`;
@@ -123,6 +123,10 @@ export function stats(month, items, prevItems, categoryType, people = []) {
       return `<div class="bars-col ${isToday ? 'is-today' : ''}" title="${isToday ? '今天 ' : ''}${d.date}：${tip || '0 元'}"><div class="bars-stack" style="height:${Math.round((d.total / maxDay) * 100)}%">${segs}</div></div>`;
     })
     .join('');
+  // 本月的今天在 X 軸標日期；靠近月初月底時省略被擋到的端點。
+  const days = calc.dayCount(month);
+  const near = (day) => isThisMonth && Math.abs(todayDay - day) < 4;
+  const axis = `<div class="chart-axis">${near(1) ? '<span></span>' : '<span>1 日</span>'}${isThisMonth ? `<span class="chart-today" style="left:${((todayDay - 0.5) / days) * 100}%">${todayDay} 日</span>` : ''}${near(days) ? '<span></span>' : `<span>${days} 日</span>`}</div>`;
   const legend = recordPeople.map((p, i) => `<span class="legend-item"><i class="dot" style="background:${personColor(i)}" aria-hidden="true"></i>${esc(p || '未指定')}</span>`).join('');
 
   const cats = calc.byCategory(items, categoryType);
@@ -146,8 +150,8 @@ export function stats(month, items, prevItems, categoryType, people = []) {
           <div class="chart-ticks" aria-hidden="true">
             <span>${calc.money(peak)}</span><span>${calc.money(Math.round(peak / 2))}</span><span>0</span>
           </div>
+          ${axis}
         </div>
-        <div class="chart-axis"><span>1 日</span><span>${calc.dayCount(month)} 日</span></div>
         <div class="chart-legend">${legend}</div>
       </div>
 
