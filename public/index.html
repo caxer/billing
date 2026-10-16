@@ -76,6 +76,16 @@
           <span class="amount-unit">元</span>
         </label>
 
+        <label class="field">
+          <span class="field-label">內容</span>
+          <input id="add-note" type="text" placeholder="例如：全聯、麥當勞、電費" enterkeyhint="done" autocomplete="off"/>
+        </label>
+
+        <label class="field">
+          <span class="field-label">分類 <small id="add-category-auto" class="auto-badge" title="依內容自動判斷，可以手動改" hidden>自動</small></span>
+          <select id="add-category" required></select>
+        </label>
+
         <div class="field">
           <label class="field-label" for="add-date">日期</label>
           <div class="date-controls">
@@ -89,16 +99,6 @@
             </div>
           </div>
         </div>
-
-        <label class="field">
-          <span class="field-label">分類</span>
-          <select id="add-category" required></select>
-        </label>
-
-        <label class="field">
-          <span class="field-label">內容</span>
-          <input id="add-note" type="text" placeholder="例如：超市採買" enterkeyhint="done"/>
-        </label>
 
         <label class="field">
           <span class="field-label">誰記的</span>

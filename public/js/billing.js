@@ -43,6 +43,42 @@ export function classify(category, mappings = {}) {
   return '日常';
 }
 
+/** 依內容判斷分類的關鍵字，依序比對，先中先用。子女的項目要寫明是誰，否則交給以前的紀錄或手動選。 */
+const GUESS_RULES = {
+  expense: [
+    [/電費|台電/, '水電氣／電費'], [/水費|自來水/, '水電氣／水費'], [/燃氣|瓦斯|天然氣/, '水電氣／燃氣'],
+    [/房貸|還款/, '房／還款'], [/管理費/, '房／管理'], [/火險|地震險/, '房／火險'], [/房屋稅/, '房／房屋'], [/地價稅/, '房／地價'],
+    [/網路|中華電信|wifi|\bnet\b/, '房／網路'],
+    [/課照|課後照顧/, '兒子／課照'],
+    [/(女兒|妹妹).*(安親)|安親.*(女兒|妹妹)/, '女兒／安親班'], [/(兒子|哥哥).*(安親)|安親.*(兒子|哥哥)/, '兒子／安親班'],
+    [/(女兒|妹妹).*(補習)|補習.*(女兒|妹妹)/, '女兒／補習班'], [/(兒子|哥哥).*(補習)|補習.*(兒子|哥哥)/, '兒子／補習班'],
+    [/藥|診所|醫院|掛號|眼科|牙醫|看病|健保/, '醫藥'],
+    [/加油|停車|高鐵|台鐵|火車|捷運|公車|uber|計程車|悠遊卡|etag|油錢|機票/, '交通'],
+    [/全聯|家樂福|好市多|costco|大買家|超市|市場|雞蛋|水餃|濾芯|刷子|簽字筆|文具|日用|衛生紙|洗衣|蝦皮|momo|ikea|宜家/, '採買'],
+    [/電影|門票|遊樂|樂園|ktv|netflix|遊戲|展覽/, '娛樂'],
+    [/零用錢|生日金|禮金|紅包/, '其他'],
+    [/餐|飯|麵|便當|早餐|午餐|晚餐|宵夜|飲料|咖啡|奶茶|麥當勞|肯德基|摩斯|必勝客|達美樂|五十嵐|星巴克|7-11|全家|小吃|火鍋|麻辣|餛飩|水餃店|煎包|肉羹|碳烤|燒烤|羊肉|羊博士|牛肉|壽司|拉麵|滷味|雞排|鹹酥雞|便利商店/, '餐飲'],
+  ],
+  income: [
+    [/年終/, '年終獎金'], [/獎金/, '獎金'], [/薪|薪水|薪資/, '薪資'], [/紅包/, '紅包'], [/退款|退費|刷退|退稅/, '退款'], [/發票|中獎/, '其他'],
+  ],
+};
+
+/**
+ * 依「內容」判斷分類：先沿用以前同樣內容最近一次的分類，再看關鍵字；判斷不出來回傳 null。
+ * allowed 是目前可選的分類，判斷結果一定在裡面。
+ */
+export function guessCategory(note, type, history = [], allowed = []) {
+  const text = String(note || '').trim().toLowerCase();
+  if (!text) return null;
+  const ok = (category) => allowed.includes(category);
+  const past = history.filter((it) => it.type === type && String(it.note || '').trim().toLowerCase() === text && ok(it.category))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  if (past) return past.category;
+  for (const [pattern, category] of GUESS_RULES[type] || []) if (pattern.test(text) && ok(category)) return category;
+  return null;
+}
+
 export function upgradeSettings(value) {
   const next = structuredClone(value);
   if (!next.billingVersion) {

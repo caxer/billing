@@ -6,7 +6,7 @@ import * as settings from './settings.js';
 import * as calc from './calc.js';
 import * as views from './views.js';
 import { readStored, writeStored, removeStored } from './storage.js';
-import { classify, GROUPS, UTILITY_PAYER, FUND_PAYER } from './billing.js';
+import { classify, GROUPS, UTILITY_PAYER, FUND_PAYER, guessCategory } from './billing.js';
 import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
 
@@ -238,6 +238,19 @@ function fillCategories(type, selected) {
   updateCategoryHint();
 }
 
+/** 依內容自動選分類；手動改過或在編輯舊紀錄時不覆蓋。 */
+let categoryTouched = false;
+function guessFromNote() {
+  if (categoryTouched || editingId) return;
+  const select = $('#add-category');
+  const guess = guessCategory($('#add-note').value, addType, [...state.allItems(), ...prevItems], settings.categories(addType));
+  $('#add-category-auto').hidden = !guess;
+  if (!guess || guess === select.value) return;
+  select.value = guess;
+  updateCategoryHint();
+  applyUtilityPayer();
+}
+
 /** 分類怎麼計入月結，放在選單的提示裡，不佔版面。 */
 function updateCategoryHint() {
   const group = classify($('#add-category').value, settings.all()?.billingGroups);
@@ -278,6 +291,7 @@ function setAddType(type) {
   $('.amount-row').classList.toggle('is-income', type === 'income');
   fillCategories(type);
   applyUtilityPayer();
+  guessFromNote();
 }
 
 /** 日期是透明 input 蓋在按鈕上，每次改值都要同步按鈕上的文字。 */
@@ -288,6 +302,8 @@ function setDate(value) {
 
 function resetForm() {
   editingId = null;
+  categoryTouched = false;
+  $('#add-category-auto').hidden = true;
   $('#add-form').reset();
   setDate(month === calc.monthKey() ? calc.todayKey() : `${month}-01`);
   fillSelect($('#add-by'), settings.people(), me);
@@ -498,7 +514,10 @@ function bind() {
   $('#add-date').addEventListener('change', (e) => setDate(e.target.value));
 
   $('#add-form').addEventListener('submit', submitForm);
+  $('#add-note').addEventListener('input', guessFromNote);
   $('#add-category').addEventListener('change', () => {
+    categoryTouched = true;
+    $('#add-category-auto').hidden = true;
     updateCategoryHint();
     applyUtilityPayer();
   });
