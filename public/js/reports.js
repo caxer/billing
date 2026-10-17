@@ -4,7 +4,7 @@ import { monthKey, money } from './calc.js';
 import { ReportCharts } from './report-charts.js';
 import { esc } from './html.js';
 const amount = (n) => n === null || n === undefined ? '—' : money(n);
-const METRICS = [['house', '房'], ['daughter', '女兒'], ['son', '兒子'], ['daily', '扣除列項後開銷'], ['utilities', '水電氣'], ['monthlyTotal', '月消費總額'], ['total', '家庭總支出']];
+const METRICS = [['house', '房'], ['daughter', '女兒'], ['son', '兒子'], ['daily', '扣除列項後開銷'], ['utilities', '水電氣'], ['monthlyTotal', '月消費總額（不含水電氣）'], ['total', '家庭總支出']];
 // 欄位怎麼算放在表頭提示，不佔版面。
 const METRIC_TIPS = { daily: '日常開銷', monthlyTotal: '房、女兒、兒子與日常', total: '月消費總額＋水電氣' };
 const metricHead = ([key, label]) => `<th scope="col"${METRIC_TIPS[key] ? ` title="${METRIC_TIPS[key]}"` : ''}>${label}</th>`;
@@ -159,7 +159,7 @@ function draw() {
 function summaryTiles(totals, label, previous) {
   const pct = billing.percentChange(totals.total, previous?.total);
   return `<div class="tiles billing-tiles">
-    ${[['家庭總支出', totals.total], ['月消費總額', totals.monthlyTotal], ['扣除列項後開銷', totals.daily], ['水電氣', totals.utilities]].map(([name, value]) =>
+    ${[['家庭總支出', totals.total], ['月消費總額（不含水電氣）', totals.monthlyTotal], ['扣除列項後開銷', totals.daily], ['水電氣', totals.utilities]].map(([name, value]) =>
       `<div class="tile"><div class="tile-label">${name}</div><div class="tile-value">${amount(value)}</div></div>`).join('')}
     <p class="tile-period">${esc(label)}${previous && pct !== null ? ` · 去年同期 ${amount(previous.total)}` : ''}</p></div>`;
 }

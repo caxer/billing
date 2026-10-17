@@ -203,7 +203,7 @@ export function monthItems(month) {
     entry.amount = entry.amount === null || detail.amount === null ? null : entry.amount + detail.amount;
     entries.set(key, entry);
   }
-  for (const [key, name] of [['total', '家庭總支出'], ['monthlyTotal', '月消費總額'], ['daily', '扣除列項後開銷'], ...STACK_GROUPS.filter((g) => g.key !== 'daily').map((g) => [g.key, g.name])]) {
+  for (const [key, name] of [['total', '家庭總支出'], ['monthlyTotal', '月消費總額（不含水電氣）'], ['daily', '扣除列項後開銷'], ...STACK_GROUPS.filter((g) => g.key !== 'daily').map((g) => [g.key, g.name])]) {
     entries.set(itemKey('總覽', name), { key: itemKey('總覽', name), group: '總覽', item: name, amount: month[key] });
   }
   return entries;
