@@ -129,6 +129,18 @@ export function dateLabel(value) {
     : `${year} 年 ${month} 月 ${day} 日`;
 }
 
+/** 兩個 YYYY-MM-DD 相差幾天（to − from），用 UTC 算才不受日光節約影響。 */
+export function daysBetween(from, to) {
+  const utc = (value) => Date.UTC(...value.split('-').map((n, i) => Number(n) - (i === 1 ? 1 : 0)));
+  return Math.round((utc(to) - utc(from)) / 86400000);
+}
+
+/** 記事離今天多遠：今天、還剩 N 天、距今 N 天。 */
+export function daysLabel(date, today = todayKey()) {
+  const diff = daysBetween(today, date);
+  return diff === 0 ? '今天' : diff > 0 ? `還剩 ${diff} 天` : `距今 ${-diff} 天`;
+}
+
 export const nf = new Intl.NumberFormat('zh-Hant-TW');
 export const money = (n) => nf.format(Math.round(n));
 

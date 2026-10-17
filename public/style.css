@@ -213,7 +213,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
   width: 100%;
   max-width: 960px;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(8px);
   border-top: 1px solid var(--line);
@@ -493,7 +493,7 @@ select { padding-right: 34px; }
 .record-sort { display: flex; align-items: center; gap: 8px; }
 .record-sort .seg { flex: 1; grid-template-columns: 1fr 1fr; margin: 0; }
 .results-summary { margin: 8px 2px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-#view-add { max-width: 620px; margin: auto; }
+#view-add, #view-calendar { max-width: 620px; margin: auto; }
 #add-cancel-row { grid-template-columns: 1fr 1fr; }
 #add-cancel-row:has(button[hidden]):not(:has(button:not([hidden]))) { display: none; }
 .danger-button { color: var(--danger); }
@@ -631,3 +631,29 @@ ul.report-notice { padding-left: 32px; }
 @media (max-width: 360px) {
   .billing-mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- 行事曆：記事 ---------- */
+
+.seg.add-types { grid-template-columns: repeat(3, 1fr); }
+.add-form.is-note .amount-row, .add-form.is-note #add-category-field, .add-form.is-note .ai-tools, .add-form.is-note .ai-status { display: none; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; }
+.cal-week { margin-bottom: 4px; font-size: 12px; color: var(--muted); }
+.cal-day {
+  position: relative;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.cal-day.is-today { border-color: var(--warn); color: var(--warn); font-weight: 650; }
+.cal-day.has-note { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+.cal-day.has-note::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--accent); }
+.cal-day.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.cal-day.is-on::after { background: var(--on-accent); }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.note-days { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note-days.is-future { color: var(--accent); font-weight: 650; }
+.note-days.is-today { color: var(--warn); font-weight: 650; }
+@media (max-width: 360px) { .tab { font-size: 11px; } }

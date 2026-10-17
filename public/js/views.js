@@ -199,6 +199,70 @@ export function recordsView(items, filters, people = [], scope = '') {
     </div>`;
 }
 
+/* ---------- 行事曆：記事 ---------- */
+
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+function noteRow(it, today, count = 1) {
+  const diff = calc.daysBetween(today, it.date);
+  return `
+    <li><button type="button" class="row" data-note-id="${esc(it.id)}" aria-label="編輯記事 ${esc(it.date)} ${esc(it.note)}">
+      <span class="row-main">
+        <span class="row-title">${esc(it.note)}</span>
+        <span class="row-meta">${esc(it.date)}${it.by ? ` · ${esc(it.by)}` : ''}${count > 1 ? ` · 共 ${count} 次` : ''}</span>
+      </span>
+      <span class="note-days${diff > 0 ? ' is-future' : diff === 0 ? ' is-today' : ''}">${calc.daysLabel(it.date, today)}</span>
+      <span class="row-arrow" aria-hidden="true">›</span>
+    </button></li>`;
+}
+
+/** 月曆標出有記事的日子；下面列即將到來（還剩幾天）與已過（距今幾天，同名只列最近一次）。點日子只看那天。 */
+export function calendar(month, notes, selected = '') {
+  const today = calc.todayKey();
+  const byDate = new Map();
+  for (const it of notes) byDate.set(it.date, [...(byDate.get(it.date) || []), it]);
+  const [y, m] = month.split('-').map(Number);
+  const cells = Array.from({ length: new Date(y, m - 1, 1).getDay() }, () => '<span></span>');
+  for (let d = 1; d <= calc.dayCount(month); d++) {
+    const date = `${month}-${String(d).padStart(2, '0')}`;
+    const list = byDate.get(date) || [];
+    const cls = `${date === today ? ' is-today' : ''}${date === selected ? ' is-on' : ''}${list.length ? ' has-note' : ''}`;
+    cells.push(`<button type="button" class="cal-day${cls}" data-date="${date}" aria-pressed="${date === selected}" aria-label="${m} 月 ${d} 日${list.length ? `，${list.length} 則記事` : ''}"${list.length ? ` title="${esc(list.map((it) => it.note).join('、'))}"` : ''}>${d}</button>`);
+  }
+
+  const section = (title, rows) => rows.length ? `<p class="section-title">${title}</p><ul class="list">${rows.join('')}</ul>` : '';
+  let body;
+  if (selected) {
+    const list = calc.byDateDesc(byDate.get(selected) || []);
+    body = list.length ? `<ul class="list">${list.map((it) => noteRow(it, today)).join('')}</ul>` : '<p class="empty">這天沒有記事</p>';
+  } else {
+    const upcoming = notes.filter((it) => it.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+    const latest = new Map();
+    for (const it of calc.byDateDesc(notes.filter((it) => it.date < today))) {
+      const key = it.note.trim();
+      const seen = latest.get(key);
+      if (seen) seen.count++;
+      else latest.set(key, { it, count: 1 });
+    }
+    body = section('即將到來', upcoming.map((it) => noteRow(it, today))) +
+      section('已過', [...latest.values()].map(({ it, count }) => noteRow(it, today, count))) ||
+      '<p class="empty">還沒有記事</p>';
+  }
+
+  return `
+    <div class="stack">
+      <div class="card">
+        <div class="cal-grid cal-week" aria-hidden="true">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
+        <div class="cal-grid" role="group" aria-label="${calc.monthLabel(month)}">${cells.join('')}</div>
+      </div>
+      <div class="cal-head">
+        ${selected ? `<p class="filter-chip">${calc.dateLabel(selected)} <button type="button" class="text-button" id="cal-clear" aria-label="看全部記事">✕</button></p>` : '<span></span>'}
+        <button type="button" class="btn-quiet" id="cal-add" title="${selected ? '在這天記一則' : '記一則，例如換濾心'}">＋ 記事</button>
+      </div>
+      ${body}
+    </div>`;
+}
+
 /** scope 有值時（例如「全部時段」）表示搜尋範圍不是本月，摘要前面標出來。 */
 export function records(items, filters, people = [], scope = '') {
   const colors = new Map(colorPeople(items, people).map((p, i) => [p, personColor(i)]));

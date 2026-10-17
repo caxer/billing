@@ -63,9 +63,10 @@
 
   <main>
     <section id="view-add" class="view">
-      <div class="seg" role="group" aria-label="收支類型">
+      <div class="seg add-types" role="group" aria-label="記帳類型">
         <button type="button" class="seg-btn is-on" data-type="expense" aria-pressed="true">支出</button>
         <button type="button" class="seg-btn" data-type="income" aria-pressed="false">收入</button>
+        <button type="button" class="seg-btn" data-type="note" aria-pressed="false" title="例如換濾心：不記金額與分類，在行事曆看距今或還剩幾天">記事</button>
       </div>
 
       <form id="add-form" class="card add-form">
@@ -87,7 +88,7 @@
           <input id="add-note" type="text" placeholder="例如：全聯、麥當勞、電費" enterkeyhint="done" autocomplete="off"/>
         </label>
 
-        <label class="field">
+        <label class="field" id="add-category-field">
           <span class="field-label">分類 <small id="add-category-auto" class="auto-badge" title="依內容自動判斷，可以手動改" hidden>自動</small></span>
           <select id="add-category" required></select>
         </label>
@@ -123,6 +124,8 @@
 
     <section id="view-records" class="view" hidden></section>
 
+    <section id="view-calendar" class="view" hidden></section>
+
     <section id="view-stats" class="view" hidden></section>
 
     <section id="view-billing" class="view" hidden></section>
@@ -133,6 +136,7 @@
   <nav class="tabs" aria-label="主要分頁">
     <button type="button" class="tab is-on" data-view="add"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8M8 12h8"/></svg><span>記帳</span></button>
     <button type="button" class="tab" data-view="records"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>明細</span></button>
+    <button type="button" class="tab" data-view="calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m9 15.5 2 2 4-4"/></svg><span>行事曆</span></button>
     <button type="button" class="tab" data-view="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7"/></svg><span>統計</span></button>
     <button type="button" class="tab" data-view="billing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7 2v4m10-4v4M3 9h18M7 13h3m4 0h3M7 17h3m4 0h3"/></svg><span>月結</span></button>
     <button type="button" class="tab" data-view="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>設定</span></button>

@@ -2,6 +2,7 @@
 
 import * as store from './store.js';
 import * as state from './state.js';
+import * as notes from './notes.js';
 import * as settings from './settings.js';
 import * as calc from './calc.js';
 import * as views from './views.js';
@@ -27,7 +28,7 @@ const ui = {
 
 const loginScreen = initLoginScreen(ui.lock, { onKey: (key) => unlockAccount(key, true) });
 
-const TITLES = { add: '記帳', records: '明細', stats: '統計', billing: '月結', settings: '設定' };
+const TITLES = { add: '記帳', records: '明細', calendar: '行事曆', stats: '統計', billing: '月結', settings: '設定' };
 
 let view = 'add';
 let month = calc.monthKey();
@@ -35,6 +36,7 @@ let prevItems = [];
 let categoryType = 'expense';
 let editingId = null;
 let addType = 'expense';
+let calendarDay = '';
 let me = readStored('spa-me') || '';
 let theme = readStored('spa-theme') || 'auto';
 let working = false;
@@ -127,7 +129,7 @@ function setSync(next, label, scope = view === 'billing' ? 'billing' : 'month') 
 function setWorking(value) {
   working = value;
   ui.app.setAttribute('aria-busy', String(value));
-  for (const control of document.querySelectorAll('.tab, [data-cat-switch], #month-nav button, #month-picker button, #add-form input, #add-form select, #add-form button, #view-add .seg-btn, #view-settings button, #view-settings input, #view-settings select')) {
+  for (const control of document.querySelectorAll('.tab, [data-cat-switch], #month-nav button, #month-picker button, #add-form input, #add-form select, #add-form button, #view-add .seg-btn, #view-calendar button, #view-settings button, #view-settings input, #view-settings select')) {
     control.disabled = value || control.hasAttribute('data-unavailable');
   }
   renderSync();
@@ -167,14 +169,22 @@ function show(next) {
   for (const sec of document.querySelectorAll('.view')) {
     sec.hidden = sec.id !== `view-${next}`;
   }
-  ui.title.textContent = next === 'add' && editingId ? '編輯紀錄' : TITLES[next];
+  ui.title.textContent = next === 'add' && editingId ? editTitle() : TITLES[next];
   ui.monthNav.hidden = next === 'add' || next === 'billing';
   togglePicker(false);
   reports.setActive(next === 'billing');
   renderSync();
   if (next === 'add' && !editingId && !$('#add-amount').value && !$('#add-note').value) resetForm();
   if (next === 'add') refreshFormOptions();
+  if (next === 'calendar') syncNotes();
   render();
+}
+
+const editTitle = () => (addType === 'note' ? '編輯記事' : '編輯紀錄');
+
+/** 打開行事曆或手動同步時重讀記事，別支手機記的會跟著出現。 */
+async function syncNotes() {
+  try { await notes.load(); } catch (err) { toast(err.message || '記事讀取失敗'); }
 }
 
 /* ---------- 繪製 ---------- */
@@ -193,6 +203,8 @@ function render() {
       input.focus({ preventScroll: true });
       input.setSelectionRange(...selection);
     }
+  } else if (view === 'calendar') {
+    $('#view-calendar').innerHTML = views.calendar(month, notes.all(), calendarDay.startsWith(month) ? calendarDay : '');
   } else if (view === 'settings') {
     renderSettings();
   }
@@ -232,6 +244,7 @@ function fillSelect(select, list, selected) {
 }
 
 function fillCategories(type, selected) {
+  if (type === 'note') return;
   const list = settings.categories(type);
   const select = $('#add-category');
   const previous = select.value;
@@ -255,7 +268,7 @@ function fillCategories(type, selected) {
 /** 依內容自動選分類；手動改過或在編輯舊紀錄時不覆蓋。 */
 let categoryTouched = false;
 function guessFromNote() {
-  if (categoryTouched || editingId) return;
+  if (categoryTouched || editingId || addType === 'note') return;
   const select = $('#add-category');
   const rules = settings.all()?.rules || {};
   const note = applyAliases($('#add-note').value, rules.aliases);
@@ -311,7 +324,7 @@ function markAi(category) {
 /** 關鍵字與以前的紀錄判斷不出來時，離開「內容」欄位後請 Claude 判斷分類。 */
 async function aiCategory() {
   const note = $('#add-note').value.trim();
-  if (!ai.available() || aiBusy || categoryTouched || editingId || !note || !$('#add-category-auto').hidden) return;
+  if (!ai.available() || aiBusy || categoryTouched || editingId || addType === 'note' || !note || !$('#add-category-auto').hidden) return;
   const run = ++aiCategoryRun;
   $('#add-category-auto').textContent = 'AI…';
   $('#add-category-auto').hidden = false;
@@ -428,6 +441,11 @@ function setAddType(type) {
   }
   $('#amount-sign').textContent = type === 'income' ? '+' : '−';
   $('.amount-row').classList.toggle('is-income', type === 'income');
+  // 記事不記金額與分類：欄位藏起來，也不能留著 required 擋住送出。
+  $('#add-form').classList.toggle('is-note', type === 'note');
+  $('#add-amount').required = type !== 'note';
+  $('#add-category').required = type !== 'note';
+  $('#add-note').placeholder = type === 'note' ? '例如：換濾心' : '例如：全聯、麥當勞、電費';
   fillCategories(type);
   applyUtilityPayer();
   guessFromNote();
@@ -439,8 +457,27 @@ function setDate(value) {
   $('#add-date-text').textContent = calc.dateLabel(value);
 }
 
+/** 編輯時不能在收支和記事之間互換，兩者存在不同檔案；kind 為 null 時全部開放。 */
+function lockTypes(kind) {
+  for (const btn of document.querySelectorAll('#view-add .seg-btn[data-type]')) {
+    const off = kind !== null && (btn.dataset.type === 'note') !== (kind === 'note');
+    btn.toggleAttribute('data-unavailable', off);
+    btn.disabled = off || working;
+  }
+}
+
+/** 從行事曆新增記事：保留記帳草稿，只把類型切成記事並帶入日期。 */
+function newNote(date) {
+  show('add');
+  if (editingId) resetForm();
+  setAddType('note');
+  setDate(date);
+  $('#add-note').focus();
+}
+
 function resetForm() {
   editingId = null;
+  lockTypes(null);
   sameRecords = [];
   $('#add-same').hidden = true;
   $('#add-same-all').checked = false;
@@ -543,6 +580,7 @@ function editRecord(id) {
   if (!item) return;
   editingId = id;
   setAddType(item.type);
+  lockTypes(item.type);
   $('#add-amount').value = String(item.amount);
   setDate(item.date);
   fillCategories(item.type, item.category);
@@ -555,12 +593,65 @@ function editRecord(id) {
   findSameName(item);
 }
 
+function editNote(id) {
+  if (working) return;
+  const item = notes.all().find((it) => it.id === id);
+  if (!item) return;
+  editingId = id;
+  sameRecords = [];
+  $('#add-same').hidden = true;
+  $('#add-same-all').checked = false;
+  setAddType('note');
+  lockTypes('note');
+  setDate(item.date);
+  $('#add-note').value = item.note;
+  fillSelect($('#add-by'), settings.people(), item.by);
+  $('#add-submit').textContent = '更新這筆';
+  $('#add-cancel').hidden = false;
+  $('#add-delete').hidden = false;
+  show('add');
+}
+
+/** 記事只有日期、內容、誰記的；日期不限本月，可以記未來的日子倒數。存完回行事曆看天數。 */
+async function submitNote(fail) {
+  const payload = { date: $('#add-date').value, note: $('#add-note').value.trim(), by: $('#add-by').value };
+  if (!payload.note) return fail('請填內容，例如換濾心');
+  if (!calc.validDate(payload.date)) return fail('請選有效日期');
+  if (!payload.by) return fail('請選記事的人');
+  setSync('busy', '儲存中');
+  setWorking(true);
+  $('#add-submit').textContent = '儲存中…';
+  let saved = false;
+  try {
+    if (editingId) {
+      if (!await notes.update(editingId, payload)) throw new Error('這則記事已被刪除，請同步後確認');
+      toast('已更新');
+    } else {
+      await notes.add(payload);
+      toast(`已記事 · ${calc.daysLabel(payload.date)}`);
+    }
+    saved = true;
+  } catch (err) {
+    setSync('error', '失敗');
+    fail(err.message || '儲存失敗');
+  } finally {
+    setWorking(false);
+    $('#add-submit').textContent = editingId ? '更新這筆' : '記下來';
+  }
+  if (!saved) return;
+  calendarDay = '';
+  resetForm();
+  setSync('ok', '已同步');
+  show('calendar');
+}
+
 async function submitForm(event) {
   event.preventDefault();
   if (working) return;
   const error = $('#add-error');
   error.hidden = true;
   if (!dataReady) return fail('資料尚未載入，請按右上角同步重試');
+  if (addType === 'note') return submitNote(fail);
   const amount = calc.parseAmount($('#add-amount').value);
   const payload = {
     type: addType,
@@ -647,6 +738,7 @@ async function switchMonth(target = month, refreshSettings = false) {
   setSync('busy', '載入中');
   try {
     if (refreshSettings || !settings.all()) await settings.load();
+    if (refreshSettings) syncNotes();
     const changed = target !== month;
     await state.load(target);
     month = target;
@@ -761,20 +853,36 @@ function bind() {
   $('#add-cancel').addEventListener('click', () => resetForm());
 
   $('#add-delete').addEventListener('click', async () => {
-    if (working || !editingId || !confirm('確定刪除這筆紀錄？')) return;
+    const isNote = addType === 'note';
+    if (working || !editingId || !confirm(isNote ? '確定刪除這則記事？' : '確定刪除這筆紀錄？')) return;
     setWorking(true);
     setSync('busy', '刪除中');
+    let removed = false;
     try {
-      if (!await state.remove(editingId)) throw new Error('這筆紀錄已被刪除，請同步後確認');
+      if (!await (isNote ? notes : state).remove(editingId)) throw new Error(`這${isNote ? '則記事' : '筆紀錄'}已被刪除，請同步後確認`);
       resetForm();
       afterWrite();
       toast('已刪除');
+      removed = true;
     } catch (err) {
       setSync('error', '刪除失敗');
       toast(err.message || '刪除失敗');
     } finally {
       setWorking(false);
     }
+    if (removed && isNote) show('calendar');
+  });
+
+  $('#view-calendar').addEventListener('click', (e) => {
+    const day = e.target.closest('.cal-day');
+    if (day) {
+      calendarDay = calendarDay === day.dataset.date ? '' : day.dataset.date;
+      return render();
+    }
+    if (e.target.closest('#cal-clear')) { calendarDay = ''; return render(); }
+    if (e.target.closest('#cal-add')) return newNote(calendarDay.startsWith(month) ? calendarDay : calc.todayKey());
+    const row = e.target.closest('[data-note-id]');
+    if (row) editNote(row.dataset.noteId);
   });
 
   for (const event of ['input', 'change']) {
@@ -997,6 +1105,7 @@ async function start() {
     prevItems = await loadMonthQuietly(calc.shiftMonth(month, -1));
     dataReady = true;
     watchMonth();
+    syncNotes();
     setSync('ok', '已同步');
   } catch (err) {
     setSync('error', '失敗');
@@ -1021,6 +1130,7 @@ async function boot() {
     reports.updateMonth(state.currentMonth(), state.allItems());
     if (!working) render();
   });
+  notes.onChange(() => { if (!working && view === 'calendar') render(); });
   if (store.isLocal()) return start();
   store.clearLegacy();
   let found;

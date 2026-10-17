@@ -3,6 +3,7 @@
 // 檔案配置（私人 repo 或 local/data/）
 //   settings.json              分類、人物、每月額度
 //   records/2026-10.json       該月所有紀錄
+//   notes.json                 記事（換濾心之類，不記金額與分類），不分月份
 //
 // GitHub 沒有推播，「即時」靠輪詢檔案 sha。寫入必須帶目前 sha，
 // 兩台手機同時改同個月會拿到 409，由呼叫端重試。
@@ -198,6 +199,41 @@ export async function saveMonth(month, items, sha) {
   validateItems(items, month);
   const payload = JSON.stringify({ month, items, updatedAt: new Date().toISOString() }, null, 2);
   await writeFile(`records/${month}.json`, payload, sha);
+}
+
+/* ---------- 記事 ---------- */
+
+export function validateNotes(items) {
+  const ids = new Set();
+  if (!Array.isArray(items)) throw new Error('記事的資料格式損毀');
+  for (const it of items) {
+    if (!it || typeof it.id !== 'string' || !it.id || ids.has(it.id) ||
+        typeof it.date !== 'string' || !validDate(it.date) ||
+        typeof it.note !== 'string' || !it.note.trim() ||
+        (it.by !== undefined && typeof it.by !== 'string') ||
+        (it.createdAt !== undefined && typeof it.createdAt !== 'string')) {
+      throw new Error('記事的資料格式損毀');
+    }
+    ids.add(it.id);
+  }
+}
+
+/** 讀全部記事。回傳 { items, sha }，還沒有記事時 items 為空陣列。 */
+export async function loadNotes() {
+  const found = await readFile('notes.json');
+  if (!found) return { items: [], sha: null };
+  try {
+    const data = JSON.parse(found.text);
+    validateNotes(data?.items);
+    return { items: data.items, sha: found.sha };
+  } catch {
+    throw new Error('記事的資料格式損毀');
+  }
+}
+
+export async function saveNotes(items, sha) {
+  validateNotes(items);
+  await writeFile('notes.json', JSON.stringify({ items, updatedAt: new Date().toISOString() }, null, 2), sha);
 }
 
 /* ---------- 設定 ---------- */
