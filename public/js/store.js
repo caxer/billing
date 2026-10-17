@@ -73,6 +73,19 @@ export async function aiKey() {
   return apiKey;
 }
 
+/**
+ * 本機模式按同步時，請本機伺服器先把線上帳本抓到 local/data。
+ * 回傳更新的檔案數；不是本機或測試資料目錄（409）回傳 0，抓不到則丟出錯誤。
+ */
+export async function pullCloud() {
+  if (!isLocal()) return 0;
+  const res = await fetch('/api/pull', { method: 'POST', cache: 'no-store' });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 409) return 0;
+  if (!res.ok) throw new Error(body.error || `抓線上失敗（${res.status}）`);
+  return body.result?.changed || 0;
+}
+
 export function lock() {
   session = null;
   apiKey = null;

@@ -438,10 +438,6 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .tag { display: inline-flex; align-items: center; gap: 2px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
 .tag button { border: 0; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; padding: 0 2px; }
 .tag .tag-edit { padding: 2px 4px; border-radius: 6px; font-size: 13px; color: var(--text); }
-.add-cat-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; margin-top: 8px; }
-.add-cat-row:has(.choice:not([hidden])) { grid-template-columns: minmax(0, 1fr) auto; }
-.add-cat-row .choice { grid-column: 1 / -1; grid-row: 2; }
-.add-cat-row select { width: auto; max-width: 112px; }
 .setting-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
 #view-settings summary { cursor: pointer; min-height: 28px; }
 .tag .tag-edit:hover { background: var(--accent-soft); }
@@ -491,9 +487,7 @@ select { padding-right: 34px; }
 .chart-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted); }
 .chart-plot > .chart-axis { position: relative; margin-top: 0; }
 .chart-today { position: absolute; top: 0; transform: translateX(-50%); color: var(--warn); font-weight: 650; white-space: nowrap; }
-.record-filters { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.record-filters .choice { grid-column: 1 / -1; }
-.search-field { grid-column: 1 / -1; }
+.record-filters { position: relative; display: grid; gap: 8px; }
 .record-sort { display: flex; align-items: center; gap: 8px; }
 .record-sort .seg { flex: 1; grid-template-columns: 1fr 1fr; margin: 0; }
 .results-summary { margin: 8px 2px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -513,8 +507,6 @@ select { padding-right: 34px; }
   .tile { padding: 20px; }
   .tile-value { font-size: 30px; margin-top: 6px; }
   .card { padding: 20px; }
-  .record-filters { grid-template-columns: 2fr 1fr 1fr; }
-  .search-field { grid-column: auto; }
   .tabs { border: 1px solid var(--line); border-radius: 18px 18px 0 0; max-width: 560px; overflow: hidden; }
   .month-nav { max-width: 320px; margin: 8px auto 0; }
   .month-picker { left: 50%; right: auto; width: 320px; transform: translateX(-50%); }

@@ -2,7 +2,7 @@
 
 import * as calc from './calc.js';
 import { budgetFor, all as allSettings } from './settings.js';
-import { transactionSummary, GROUPS, UTILITY_PAYER, utilityBudget } from './billing.js';
+import { transactionSummary, UTILITY_PAYER, utilityBudget } from './billing.js';
 import { esc } from './html.js';
 
 const tile = (label, value, mod, sub) => `
@@ -190,11 +190,10 @@ export function recordsView(items, filters, people = [], scope = '') {
     <div class="stack records-section">
       <div class="record-filters">
         <input id="record-query" class="search-field" type="search" data-filter="query" aria-label="搜尋紀錄" placeholder="搜尋全部時段：內容、分類、日期、金額" value="${esc(filters.query || '')}" autocomplete="off"/>
-        <select data-filter="type" data-choices="auto" aria-label="收支"><option value="">全部</option><option value="expense" ${filters.type === 'expense' ? 'selected' : ''}>支出</option><option value="income" ${filters.type === 'income' ? 'selected' : ''}>收入</option></select>
         <select data-filter="by" data-choices="auto" aria-label="記帳人"><option value="">所有人</option>${filterPeople.map((by) => `<option value="${esc(by)}" ${filters.by === by ? 'selected' : ''}>${esc(by)}</option>`).join('')}</select>
       </div>
       ${filters.category ? `<p class="filter-chip">分類：${esc(filters.category)} <button type="button" class="text-button" id="record-clear-category" aria-label="取消分類篩選">✕</button></p>` : ''}
-      <div class="record-sort"><div class="seg" role="group" aria-label="排序">${sortButtons}</div><button type="button" id="record-clear" class="text-button" title="清除搜尋與篩選">清除</button></div>
+      <div class="record-sort"><div class="seg" role="group" aria-label="排序">${sortButtons}</div></div>
       <div id="record-results">${records(items, filters, people, scope)}</div>
     </div>`;
 }
@@ -274,12 +273,8 @@ export function records(items, filters, people = [], scope = '') {
 /* ---------- 設定 ---------- */
 
 export function settings(ctx) {
-  const { people, members = people, expenseCats, incomeCats, month, me, theme, budgets = {} } = ctx;
+  const { people, members = people, month, me, theme, budgets = {} } = ctx;
   const totalLimit = members.reduce((sum, person) => sum + budgetFor(person, month), 0);
-  const catTags = (list, kind) => list
-    .map((c) => `<span class="tag">${esc(c)}<button type="button" data-del-cat="${kind}" data-category="${esc(c)}" aria-label="刪除 ${esc(c)}">×</button></span>`)
-    .join('');
-
   return `
     <div class="stack">
       <div class="card">
@@ -320,25 +315,6 @@ export function settings(ctx) {
         <div class="tag-list" id="people-list">${people.map((p) => p === UTILITY_PAYER
           ? `<span class="tag tag-fixed" title="水電氣扣款帳戶，不能改名">${esc(p)}</span>`
           : `<span class="tag"><button type="button" class="tag-edit" data-rename-person="${esc(p)}" aria-label="把 ${esc(p)} 改名" title="點名字改名，所有月份的紀錄一起改">${esc(p)} <span aria-hidden="true">✎</span></button></span>`).join('')}</div>
-      </div>
-
-      <div class="card">
-        <details id="cats-expense-card"><summary class="budget-title">支出分類 <span class="budget-num">${expenseCats.length}</span></summary>
-        <div class="tag-list" id="cats-expense">${catTags(expenseCats, 'expense')}</div></details>
-        <div class="add-cat-row">
-          <input id="new-cat-expense" type="text" placeholder="新增支出分類" enterkeyhint="done"/>
-          <select id="new-cat-group" data-choices="auto" aria-label="歸在哪個大項" title="房、女兒、兒子從月消費總額分列；日常歸在扣除列項後開銷；水電氣另計">${GROUPS.map((g) => `<option>${g}</option>`).join('')}</select>
-          <button type="button" class="btn-quiet" data-add-cat="expense">新增</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <details id="cats-income-card"><summary class="budget-title">收入分類 <span class="budget-num">${incomeCats.length}</span></summary>
-        <div class="tag-list" id="cats-income">${catTags(incomeCats, 'income')}</div></details>
-        <div class="date-row" style="margin-top:8px">
-          <input id="new-cat-income" type="text" placeholder="新增收入分類" enterkeyhint="done"/>
-          <button type="button" class="btn-quiet" data-add-cat="income">新增</button>
-        </div>
       </div>
 
       <div class="setting-actions">

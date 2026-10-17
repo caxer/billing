@@ -43,7 +43,7 @@ let working = false;
 let dataReady = false;
 let unlocking = false;
 let stopWatching = () => {};
-const filters = { query: '', type: '', by: '', category: '', sort: 'date', dir: 'desc' };
+const filters = { query: '', by: '', category: '', sort: 'date', dir: 'desc' };
 
 /* ---------- 部署更新偵測 ---------- */
 
@@ -224,8 +224,6 @@ function renderSettings() {
   $('#view-settings').innerHTML = views.settings({
     people: all.people,
     members: settings.members(),
-    expenseCats: all.expenseCategories,
-    incomeCats: all.incomeCategories,
     month,
     me: meValue,
     theme,
@@ -874,8 +872,21 @@ function bind() {
     togglePicker(false);
     $('#month-label').focus();
   });
-  ui.sync.addEventListener('click', () => {
+  ui.sync.addEventListener('click', async () => {
     if (updateReady) { location.reload(); return; }
+    if (working) return;
+    // 本機模式先把線上帳本抓到 local/data，再重讀。
+    if (store.isLocal()) {
+      setWorking(true);
+      setSync('busy', '抓線上中');
+      try {
+        if (await store.pullCloud()) toast('已抓到線上最新資料');
+      } catch (err) {
+        toast(`${err.message}，顯示本機資料`);
+      } finally {
+        setWorking(false);
+      }
+    }
     switchMonth(month, true);
   });
 
@@ -973,10 +984,6 @@ function bind() {
   }
 
   $('#view-records').addEventListener('click', (e) => {
-    if (e.target.closest('#record-clear')) {
-      Object.assign(filters, { query: '', type: '', by: '', category: '' });
-      return render();
-    }
     if (e.target.closest('#record-clear-category')) { filters.category = ''; return render(); }
     const sort = e.target.closest('[data-sort]');
     if (sort) {
@@ -1017,46 +1024,15 @@ function bindSettings() {
   });
 
   root.addEventListener('click', async (e) => {
-    const addBtn = e.target.closest('[data-add-cat]');
-    const delBtn = e.target.closest('[data-del-cat]');
     const budgetBtn = e.target.closest('[data-budget-person]');
     const renameBtn = e.target.closest('[data-rename-person]');
     if (e.target.closest('#set-export')) return exportCsv();
-    if (working || (!addBtn && !delBtn && !budgetBtn && !renameBtn)) return;
+    if (working || (!budgetBtn && !renameBtn)) return;
     const targetMonth = month;
     setWorking(true);
     setSync('busy', '儲存設定');
 
     try {
-      if (addBtn) {
-        const kind = addBtn.dataset.addCat;
-        const input = $(`#new-cat-${kind}`);
-        let name = input.value.trim();
-        if (!name) return toast('請輸入分類名稱');
-        let group = kind === 'expense' ? $('#new-cat-group').value : null;
-        if (group && group !== '日常' && !name.startsWith(`${group}／`)) name = `${group}／${name}`;
-        if (group === '日常') group = classify(name);
-        const key = kind === 'income' ? 'incomeCategories' : 'expenseCategories';
-        await settings.save((s) => {
-          if (!s[key].includes(name)) s[key].push(name);
-          if (group) s.billingGroups[name] = group;
-        });
-        toast('已新增');
-      }
-
-      if (delBtn) {
-        const kind = delBtn.dataset.delCat;
-        const name = delBtn.dataset.category;
-        if (!confirm(`確定刪除分類「${name}」？已記錄的紀錄不會受影響。`)) return;
-        const key = kind === 'income' ? 'incomeCategories' : 'expenseCategories';
-        await settings.save((s) => {
-          const remaining = s[key].filter((c) => c !== name);
-          if (!remaining.length) throw new Error('請至少保留一個分類');
-          s[key] = remaining;
-        });
-        toast('已刪除');
-      }
-
       if (budgetBtn) {
         const person = budgetBtn.dataset.budgetPerson;
         const value = Number($(`#set-budget-${budgetBtn.dataset.budgetIndex}`).value || 0);
@@ -1202,7 +1178,7 @@ async function boot() {
   bindSettings();
   reports.init($('#view-billing'), { settings: () => settings.all(), sync: (next, label) => setSync(next, label, 'billing'),
     // 占比點名稱或分類：到明細搜尋全部時段。
-    search: (query, category = '') => { Object.assign(filters, { query, category, type: '', by: '' }); show('records'); } });
+    search: (query, category = '') => { Object.assign(filters, { query, category, by: '' }); show('records'); } });
   state.onChange(() => {
     reports.updateMonth(state.currentMonth(), state.allItems());
     if (!working) render();
