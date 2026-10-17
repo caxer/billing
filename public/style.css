@@ -570,6 +570,16 @@ ul.report-notice { padding-left: 32px; }
 .report-total > * { font-weight: 700; background: var(--accent-soft) !important; }
 .future-month td { color: var(--muted); }
 .report-table .text-button { min-height: 28px; padding: 2px 8px; }
+/* 年度明細：大項列可點開項目，項目列縮排、字小一號；合計欄與總額列加粗。 */
+.year-table .group-row > * { font-weight: 650; }
+.year-table .group-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 6px 0 0; border: 0; background: transparent; color: var(--text); font: inherit; font-weight: 650; cursor: pointer; }
+.year-table .group-toggle span { width: 12px; color: var(--muted); }
+.year-table .item-row > * { font-size: 12px; color: var(--muted); }
+.year-table .item-row > th { padding-left: 28px; font-weight: 400; }
+.year-table .item-row > td { color: var(--text); }
+.year-table .year-sum { font-weight: 650; border-left: 1px solid var(--line); }
+.year-table .is-future { color: var(--muted); }
+.year-table tbody + tbody > tr:first-child > * { border-top: 1px solid var(--line); }
 .billing-layout summary { cursor: pointer; font-weight: 600; min-height: 44px; display: list-item; padding: 8px 0; }
 @media (min-width: 760px) {
   .billing-mini-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }

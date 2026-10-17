@@ -13,6 +13,8 @@ let archive = null;
 let records = {}, versions = new Map(), active = false, initialized = false, running = null, error = '', lastSync = null;
 let revision = 0;
 let charts;
+/** 年度明細展開的大項，重畫時保留。 */
+const openGroups = new Set();
 const monthCache = new Map();
 
 export function init(element, getters) {
@@ -48,6 +50,8 @@ export function init(element, getters) {
     if (topBy) { shareTop = topBy.dataset.shareTop; draw(); }
     const pick = e.target.closest('[data-share-pick]');
     if (pick) { sharePick = pick.dataset.sharePick; draw(); }
+    const toggle = e.target.closest('[data-year-group]');
+    if (toggle) { const name = toggle.dataset.yearGroup; if (!openGroups.delete(name)) openGroups.add(name); draw(); return; }
     const monthButton = e.target.closest('[data-billing-month]');
     if (monthButton) { detailMonth = monthButton.dataset.billingMonth; draw(); root.querySelector('#billing-detail')?.scrollIntoView({ block: 'nearest' }); }
   });
@@ -266,12 +270,7 @@ function yearView() {
     ${conflicts.length ? `<p class="report-notice">${conflicts.map((m) => m.month).join('、')} 只採歷史月結</p>` : ''}
     ${current.some((m) => m.daily < 0) ? '<p class="report-notice">歷史扣除列項後開銷有負值，請核對</p>' : ''}
     ${kpiView(stats, previous)}${charts.monthly(year)}
-    <div class="card"><h3 class="section-title">年度月結明細</h3>
-      <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動年度月結明細"><table class="report-table"><thead><tr><th scope="col">月份</th>${METRICS.map(metricHead).join('')}</tr></thead><tbody>
-        ${months.map((m, i) => `<tr${i >= n ? ' class="future-month"' : ''}><th scope="row" title="${i >= n ? '未到月份' : sourceLabel(m.source)}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1} 月</button>${i < n && ['pending', 'missing'].includes(m.source) ? `<small>${sourceLabel(m.source)}</small>` : ''}</th>${METRICS.map(([key]) => `<td>${i >= n ? '—' : amount(m[key])}</td>`).join('')}</tr>`).join('')}
-        <tr class="report-total"><th scope="row">期間合計</th>${METRICS.map(([key]) => `<td>${amount(totals[key])}</td>`).join('')}</tr>
-      </tbody></table></div>
-    </div>${classificationView(months, n)}${detailMonth ? detailView(months.find((m) => m.month === detailMonth)) : ''}`;
+    ${yearTable(months, n, totals)}${detailMonth ? detailView(months.find((m) => m.month === detailMonth)) : ''}`;
 }
 
 function kpiView(stats, previous) {
@@ -302,13 +301,40 @@ function periodLabel(months, n) {
   return ranges.map(([a, b]) => a === b ? String(a) : `${a}–${b}`).join('、') + ' 月';
 }
 
-function classificationView(months, n) {
-  const rows = billing.classificationMatrix(months);
-  return `<details class="card" id="billing-classifications"><summary title="歷史日常只有月合計；「—」表示沒有該粒度資料或未到月份">分類年度明細</summary>
-    ${rows.length ? `<div class="report-table-wrap" tabindex="0" aria-label="可左右捲動分類年度明細"><table class="report-table"><thead><tr><th scope="col">分類／項目</th>${months.map((m, i) => `<th scope="col">${i + 1} 月</th>`).join('')}<th scope="col">期間已知合計</th></tr></thead><tbody>${rows.map((r) => {
-      const known = r.months.slice(0, n).filter((v) => v !== null);
-      return `<tr><th scope="row">${esc(r.item)}<small>${esc(r.group)}</small></th>${r.months.map((v, i) => `<td>${i >= n ? '—' : amount(v)}</td>`).join('')}<td>${known.length ? amount(known.reduce((sum, v) => sum + v, 0)) : '—'}</td></tr>`;
-    }).join('')}</tbody></table></div>` : '<p class="empty">尚無分類明細</p>'}</details>`;
+/** 年度明細：列是大項（點開看項目），欄是月份；月消費總額與家庭總支出接在算進它們的大項後面。 */
+const YEAR_GROUPS = [['房', 'house'], ['女兒', 'daughter'], ['兒子', 'son'], ['日常', 'daily', '扣除列項後開銷']];
+const itemRank = (group, item) => {
+  const i = group === '日常' ? billing.DAILY_ORDER.indexOf(item) : billing.BILLING_CATEGORIES.indexOf(`${group}／${item}`);
+  return i < 0 ? 999 : i;
+};
+
+function yearTable(months, n, totals) {
+  const items = billing.classificationMatrix(months);
+  const counted = (i) => i < n && !['pending', 'missing'].includes(months[i].source);
+  // 大項與項目的 0 留空比較好讀；總額列照常顯示。
+  const cells = (pick, blankZero = true) => months.map((m, i) => {
+    const v = i >= n ? '' : pick(m, i);
+    return `<td data-month="${m.month}"${i >= n ? ' class="is-future"' : ''}>${v === '' || (blankZero && v === 0) ? '' : amount(v)}</td>`;
+  }).join('');
+  const group = ([name, key, tip]) => {
+    const open = openGroups.has(name);
+    const rows = items.filter((r) => r.group === name).sort((a, b) => itemRank(name, a.item) - itemRank(name, b.item) || a.item.localeCompare(b.item, 'zh-Hant'));
+    const head = `<tr class="group-row" data-group="${name}"><th scope="row"><button type="button" class="group-toggle" data-year-group="${name}" aria-expanded="${open}"${tip ? ` title="${tip}"` : ''}><span aria-hidden="true">${open ? '▾' : '▸'}</span>${name}</button></th>${cells((m) => m[key])}<td class="year-sum">${amount(totals[key])}</td></tr>`;
+    const body = open ? rows.map((r) => {
+      const known = r.months.filter((v, i) => counted(i) && v !== null);
+      return `<tr class="item-row"><th scope="row">${esc(r.item)}</th>${cells((m, i) => r.months[i])}<td class="year-sum">${known.length ? amount(known.reduce((s, v) => s + v, 0)) : '—'}</td></tr>`;
+    }).join('') : '';
+    return `<tbody>${head}${body}</tbody>`;
+  };
+  const total = (key, label, tip) => `<tbody><tr class="report-total" data-total="${key}"><th scope="row" title="${tip}">${label}</th>${cells((m) => m[key], false)}<td class="year-sum">${amount(totals[key])}</td></tr></tbody>`;
+  const head = months.map((m, i) => `<th scope="col"${i >= n ? ' class="is-future"' : ''} title="${i >= n ? '未到月份' : `${sourceLabel(m.source)}，點開看當月明細`}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1}月</button>${i < n && ['pending', 'missing'].includes(m.source) ? `<small>${sourceLabel(m.source)}</small>` : ''}</th>`).join('');
+  return `<div class="card"><h3 class="section-title" title="點大項看底下的項目，點月份看當月明細">年度明細</h3>
+    <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動年度明細"><table class="report-table year-table"><thead><tr><th scope="col">項目</th>${head}<th scope="col">合計</th></tr></thead>
+      ${YEAR_GROUPS.map(group).join('')}
+      ${total('monthlyTotal', '月消費總額<small>不含水電氣</small>', '房、女兒、兒子與日常')}
+      ${group(['水電氣', 'utilities'])}
+      ${total('total', '家庭總支出', '月消費總額＋水電氣')}
+    </table></div></div>`;
 }
 
 function detailView(m) {
