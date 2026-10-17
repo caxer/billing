@@ -358,6 +358,10 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .ai-tools svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .ai-tools [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .ai-status { margin: -4px 2px 0; font-size: 13px; color: var(--muted); }
+/* 內容的名稱提示：一排可左右滑，不換行。 */
+.note-suggest { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.note-suggest::-webkit-scrollbar { display: none; }
+.note-suggest .chip { flex: none; min-height: 34px; padding: 4px 12px; font-size: 14px; }
 /* 選項少的下拉選單改成按鈕（choices.js）：原本的 select 藏在後面保存值。 */
 .choice-source { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; border: 0 !important; opacity: 0; pointer-events: none; overflow: hidden; }
 .seg.choice { margin: 0; gap: 4px; }

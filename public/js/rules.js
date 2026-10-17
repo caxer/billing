@@ -119,6 +119,32 @@ export function applyAliases(note, aliases = []) {
   return text;
 }
 
+/**
+ * 輸入內容時提示以前用過的名稱，讓同樣的東西寫法一致。名稱先套用別名、只提示標準名；
+ * 開頭相同的排最前，其次包含輸入的字、輸入裡包含的名稱、差一個字的，同一級筆數多的在前；和輸入一樣就不提示。
+ * names 是 [{ name, count }]。
+ */
+export function suggestNames(input, names, aliases = [], limit = 6) {
+  const flat = (s) => String(s || '').normalize('NFKC').toLowerCase().replace(PUNCT, '');
+  const q = flat(input);
+  if (!q) return [];
+  const counts = new Map();
+  for (const n of names) {
+    const name = applyAliases(n.name, aliases);
+    if (name) counts.set(name, (counts.get(name) || 0) + (n.count || 1));
+  }
+  const ranked = [];
+  for (const [name, count] of counts) {
+    const key = flat(name);
+    if (!key || key === q) continue;
+    const rank = key.startsWith(q) ? 0 : key.includes(q) ? 1 : key.length >= 2 && q.includes(key) ? 2
+      : q.length >= 3 && distance(q, key) === 1 ? 3 : -1;
+    if (rank >= 0) ranked.push({ name, count, rank });
+  }
+  return ranked.sort((a, b) => a.rank - b.rank || b.count - a.count || a.name.length - b.name.length)
+    .slice(0, limit).map((r) => r.name);
+}
+
 /** 依關鍵字規則判斷分類：名稱裡出現的最長關鍵字為準；分類不在可選清單時不回傳。 */
 export function ruleCategory(note, keywords = [], allowed = []) {
   const text = String(note || '').normalize('NFKC').toLowerCase();

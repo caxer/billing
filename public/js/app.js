@@ -13,7 +13,7 @@ import { initLoginScreen } from './login-screen.js';
 import * as ai from './ai.js';
 import { preparePhoto } from './photo.js';
 import { asButtons, enhance } from './choices.js';
-import { applyAliases } from './rules.js';
+import { applyAliases, suggestNames } from './rules.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -343,13 +343,59 @@ async function fillFromAi(entry) {
   if (entry.date && calc.validDate(entry.date) && !entry.date.startsWith(month) && !await switchMonth(entry.date.slice(0, 7))) return;
   setAddType(entry.type);
   if (entry.amount) $('#add-amount').value = String(entry.amount);
-  if (entry.note) $('#add-note').value = entry.note;
+  if (entry.note) $('#add-note').value = sameSpelling(entry.note);
   if (entry.date && calc.validDate(entry.date) && entry.date.startsWith(month)) setDate(entry.date);
   if (!entry.category || !markAi(entry.category)) guessFromNote();
+  renderNoteSuggest(true);
+}
+
+/* ---------- 內容的名稱提示：輸入時列出以前用過的名稱，寫法一致 ---------- */
+
+/** 以前用過的名稱與筆數：記事看記事，收支看全部時段同收支的紀錄（還沒讀完先用本月與上月）。 */
+function pastNames() {
+  const list = addType === 'note' ? notes.all()
+    : Object.values({ [calc.shiftMonth(month, -1)]: prevItems, ...reports.allRecords(), [month]: state.allItems() }).flat()
+      .filter((it) => it.type === addType && !['結餘調整', '與原表差額'].includes(it.category));
+  const counts = new Map();
+  for (const it of list) {
+    const note = (it.note || '').trim();
+    if (note) counts.set(note, (counts.get(note) || 0) + 1);
+  }
+  return [...counts].map(([name, count]) => ({ name, count }));
+}
+
+/** Claude 給的名稱和以前的只差大小寫、全半形或空白時，沿用以前的寫法。 */
+function sameSpelling(note) {
+  const flat = (s) => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+  const name = applyAliases(note, settings.all()?.rules?.aliases);
+  return pastNames().find((n) => flat(n.name) === flat(name))?.name || name;
+}
+
+/** 輸入中或 AI 剛填好時顯示；離開欄位就收起來。 */
+function renderNoteSuggest(show = document.activeElement === $('#add-note')) {
+  const box = $('#note-suggest');
+  const names = show ? suggestNames($('#add-note').value, pastNames(), settings.all()?.rules?.aliases) : [];
+  box.replaceChildren(...names.map((name) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chip';
+    button.textContent = name;
+    button.dataset.name = name;
+    return button;
+  }));
+  box.hidden = !names.length;
+}
+
+function chooseName(name) {
+  aiCategoryRun++;
+  $('#add-note').value = name;
+  $('#add-category-auto').hidden = true;
+  guessFromNote();
+  renderNoteSuggest(false);
 }
 
 async function runAi(request, label) {
-  if (aiBusy || working) return;
+  if (aiBusy || working) { aiStatus(''); toast('正在處理上一筆，稍後再試一次'); return; }
   aiBusy = true;
   aiCategoryRun++;
   for (const id of ['#ai-voice', '#ai-photo']) $(id).disabled = true;
@@ -367,29 +413,46 @@ async function runAi(request, label) {
   }
 }
 
+/**
+ * 聽到完整的一句、再按一次或過了 12 秒就自己收尾，不等 onend：iPhone Safari 有時不送 onend，
+ * 舊的辨識沒放掉麥克風時第二次就聽不到，所以收尾一律 abort，之後舊辨識送來的事件也不理。
+ */
 function toggleVoice() {
-  if (listening) { listening.stop(); return; }
+  if (listening) { listening(); return; }
   const rec = new Recognition();
   rec.lang = 'zh-TW';
   rec.interimResults = true;
-  let heard = '', failed = '';
-  rec.onresult = (e) => {
-    heard = [...e.results].map((r) => r[0].transcript).join('');
-    aiStatus(`「${heard}」`);
-  };
-  rec.onerror = (e) => { if (!['aborted', 'no-speech'].includes(e.error)) failed = e.error === 'not-allowed' ? '請允許使用麥克風' : `語音辨識失敗（${e.error}）`; };
-  rec.onend = () => {
+  let heard = '', failed = '', done = false, timer;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
     listening = null;
+    rec.onresult = rec.onerror = rec.onend = null;
+    try { rec.abort(); } catch { /* 已經停了 */ }
     $('#ai-voice').setAttribute('aria-pressed', 'false');
     $('#ai-voice span').textContent = '說一筆';
-    if (failed) { aiStatus(''); toast(failed); } else if (heard.trim()) runAi({ text: heard.trim() }, `「${heard.trim()}」`);
+    const text = heard.trim();
+    if (failed) { aiStatus(''); toast(failed); } else if (text) runAi({ text }, `「${text}」`);
     else aiStatus('沒有聽到聲音，再按一次「說一筆」');
   };
-  listening = rec;
+  rec.onresult = (e) => {
+    const results = [...e.results];
+    heard = results.map((r) => r[0].transcript).join('');
+    aiStatus(`「${heard}」`);
+    if (results.length && results.every((r) => r.isFinal)) finish();
+  };
+  rec.onerror = (e) => {
+    if (!['aborted', 'no-speech'].includes(e.error)) failed = e.error === 'not-allowed' ? '請允許使用麥克風' : `語音辨識失敗（${e.error}）`;
+    finish();
+  };
+  rec.onend = finish;
+  listening = finish;
   $('#ai-voice').setAttribute('aria-pressed', 'true');
   $('#ai-voice span').textContent = '聆聽中…';
   aiStatus('請說，例如「昨天全聯三百五」');
-  try { rec.start(); } catch { listening = null; toast('無法開始語音辨識'); }
+  timer = setTimeout(finish, 12000);
+  try { rec.start(); } catch { failed = '無法開始語音辨識'; finish(); }
 }
 
 async function photoChosen(e) {
@@ -449,6 +512,7 @@ function setAddType(type) {
   fillCategories(type);
   applyUtilityPayer();
   guessFromNote();
+  renderNoteSuggest();
 }
 
 /** 日期是透明 input 蓋在按鈕上，每次改值都要同步按鈕上的文字。 */
@@ -486,6 +550,7 @@ function resetForm() {
   aiStatus('');
   $('#add-category-auto').hidden = true;
   $('#add-form').reset();
+  renderNoteSuggest(false);
   setDate(month === calc.monthKey() ? calc.todayKey() : `${month}-01`);
   fillSelect($('#add-by'), settings.people(), me);
   setAddType('expense');
@@ -833,7 +898,19 @@ function bind() {
 
   $('#add-form').addEventListener('submit', submitForm);
   asButtons($('#add-by'));
-  $('#add-note').addEventListener('input', guessFromNote);
+  $('#add-note').addEventListener('input', () => { guessFromNote(); renderNoteSuggest(); });
+  // 第一次點內容時讀全部月份，之後的提示才有以前的名稱。
+  $('#add-note').addEventListener('focus', () => {
+    if (addType !== 'note' && !reports.allLoaded()) reports.loadAll().then(() => renderNoteSuggest(), () => {});
+  });
+  // 晚一點收，點提示時不會先被收掉。
+  $('#add-note').addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== $('#add-note')) renderNoteSuggest(false); }, 200));
+  // 按下提示時不讓輸入框失去焦點，避免先把打到一半的字送去判斷分類。
+  $('#note-suggest').addEventListener('pointerdown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+  $('#note-suggest').addEventListener('click', (e) => {
+    const button = e.target.closest('button');
+    if (button && !working) chooseName(button.dataset.name);
+  });
   $('#add-note').addEventListener('change', aiCategory);
   $('#ai-voice').addEventListener('click', toggleVoice);
   $('#ai-photo').addEventListener('click', () => $('#ai-photo-file').click());

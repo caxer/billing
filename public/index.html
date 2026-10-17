@@ -83,10 +83,11 @@
           <span class="amount-unit">元</span>
         </label>
 
-        <label class="field">
-          <span class="field-label">內容</span>
+        <div class="field">
+          <label class="field-label" for="add-note">內容</label>
           <input id="add-note" type="text" placeholder="例如：全聯、麥當勞、電費" enterkeyhint="done" autocomplete="off"/>
-        </label>
+          <div id="note-suggest" class="note-suggest" role="group" aria-label="以前用過的名稱" title="以前用過的名稱，點一下帶入，寫法一致" hidden></div>
+        </div>
 
         <label class="field" id="add-category-field">
           <span class="field-label">分類 <small id="add-category-auto" class="auto-badge" title="依內容自動判斷，可以手動改" hidden>自動</small></span>
