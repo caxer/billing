@@ -2,7 +2,7 @@
 
 import * as calc from './calc.js';
 import { budgetFor, all as allSettings } from './settings.js';
-import { transactionSummary, UTILITY_PAYER, utilityBudget } from './billing.js';
+import { transactionSummary, UTILITY_PAYER, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
 import { esc } from './html.js';
 
 const tile = (label, value, mod, sub) => `
@@ -177,7 +177,9 @@ export function stats(month, items, prevItems, categoryType, people = []) {
 
 /* ---------- 明細 ---------- */
 
-const SORTS = [['date', '日期', '新到舊', '舊到新'], ['amount', '金額', '大到小', '小到大']];
+const SORTS = [['date', '日期', '新到舊', '舊到新'], ['amount', '金額', '大到小', '小到大'], ['name', '名稱', '依名稱排列', '名稱反向'], ['category', '分類', '依食衣住行育樂醫其他、房、女兒、兒子、水電氣', '分類反向']];
+/** 分類排序：日常依食衣住行育樂醫其他，再接房、女兒、兒子、水電氣的項目。 */
+const CATEGORY_ORDER = [...DAILY_ORDER, ...BILLING_CATEGORIES];
 
 export function recordsView(items, filters, people = [], scope = '') {
   // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從篩選消失。
@@ -265,7 +267,7 @@ export function calendar(month, notes, selected = '') {
 /** scope 有值時（例如「全部時段」）表示搜尋範圍不是本月，摘要前面標出來。 */
 export function records(items, filters, people = [], scope = '') {
   const colors = new Map(colorPeople(items, people).map((p, i) => [p, personColor(i)]));
-  const found = calc.sortItems(calc.filterItems(items, filters), filters);
+  const found = calc.sortItems(calc.filterItems(items, filters), { ...filters, categoryOrder: CATEGORY_ORDER });
   const totals = calc.summarize(found);
   return `<p class="results-summary" role="status">${scope ? `${esc(scope)} · ` : ''}${found.length} / ${items.length} 筆 · 支出 ${calc.money(totals.expense)} · 收入 ${calc.money(totals.income)}</p>${found.length ? recordList(found, colors) : `<p class="empty">${items.length ? '沒有符合的紀錄' : '這個月還沒有紀錄'}</p>`}`;
 }
@@ -302,23 +304,13 @@ export function settings(ctx) {
           const limit = yearly ? utilityBudget({ budgets }, period) : budgetFor(person, month);
           return `
           <div class="budget-input">
-            <span class="budget-who">${personLabel(person, index)}${yearly ? ` <small>${period}</small>` : ''}</span>
+            <span class="budget-who">${yearly ? `<span title="水電氣扣款帳戶，不能改名">${personLabel(person, index)}</span> <small>${period}</small>`
+              : `<button type="button" class="tag-edit" data-rename-person="${esc(person)}" aria-label="把 ${esc(person)} 改名" title="點名字改名，所有月份的紀錄一起改">${personLabel(person, index)} <span aria-hidden="true">✎</span></button>`}</span>
             <input id="set-budget-${index}" type="number" inputmode="numeric" placeholder="${limit ? calc.money(limit) : '未設定'}" title="${yearly ? `${period} 年水電氣預算，填 0 取消` : '填 0 取消上限；沒設定的月份沿用預設'}"
                    value="${esc(budgets[person]?.[period] ?? '')}" aria-label="${esc(person)}${yearly ? `${period} 年度預算` : '本月支出額度'}" min="0" step="1"/>
             <button type="button" class="btn-quiet" data-budget-person="${esc(person)}" data-budget-index="${index}" data-budget-period="${period}">套用</button>
           </div>`;
         }).join('')}
-      </div>
-
-      <div class="card">
-        <div class="budget-title">記帳人</div>
-        <div class="tag-list" id="people-list">${people.map((p) => p === UTILITY_PAYER
-          ? `<span class="tag tag-fixed" title="水電氣扣款帳戶，不能改名">${esc(p)}</span>`
-          : `<span class="tag"><button type="button" class="tag-edit" data-rename-person="${esc(p)}" aria-label="把 ${esc(p)} 改名" title="點名字改名，所有月份的紀錄一起改">${esc(p)} <span aria-hidden="true">✎</span></button></span>`).join('')}</div>
-      </div>
-
-      <div class="setting-actions">
-        <button type="button" class="btn-quiet" id="set-export" title="匯出${calc.monthLabel(month)}全部紀錄，可用 Excel 開啟">匯出 CSV</button>
       </div>
     </div>`;
 }

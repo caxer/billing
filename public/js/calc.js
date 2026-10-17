@@ -101,9 +101,21 @@ export function byDay(items, month, type) {
 }
 
 /** 明細排序：日期或金額，desc 為新到舊／大到小；同值依日期再依建立時間。 */
-export function sortItems(items, { sort = 'date', dir = 'desc' } = {}) {
+/**
+ * 排序：日期、金額預設新到舊／大到小；名稱、分類預設由前到後（分類依 categoryOrder，沒列到的接在後面依筆畫）。
+ * dir 為 asc 時整個反過來；同名稱或同分類再依日期新到舊。
+ */
+export function sortItems(items, { sort = 'date', dir = 'desc', categoryOrder = [] } = {}) {
   const sign = dir === 'asc' ? -1 : 1;
-  return [...items].sort((a, b) => sign * ((sort === 'amount' ? b.amount - a.amount : 0) ||
+  const text = (a, b) => a.localeCompare(b, 'zh-Hant');
+  const name = (it) => String(it.note || '').trim() || it.category;
+  const rank = (c) => { const i = categoryOrder.indexOf(c); return i < 0 ? categoryOrder.length : i; };
+  const key = {
+    amount: (a, b) => b.amount - a.amount,
+    name: (a, b) => text(name(a), name(b)),
+    category: (a, b) => rank(a.category) - rank(b.category) || text(a.category, b.category),
+  }[sort] || (() => 0);
+  return [...items].sort((a, b) => sign * (key(a, b) ||
     b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt))));
 }
 

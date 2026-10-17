@@ -1028,7 +1028,6 @@ function bindSettings() {
   root.addEventListener('click', async (e) => {
     const budgetBtn = e.target.closest('[data-budget-person]');
     const renameBtn = e.target.closest('[data-rename-person]');
-    if (e.target.closest('#set-export')) return exportCsv();
     if (working || (!budgetBtn && !renameBtn)) return;
     const targetMonth = month;
     setWorking(true);
@@ -1095,24 +1094,6 @@ function bindSettings() {
       if (ui.sync.dataset.state === 'busy') setSync('ok', '已同步');
     }
   });
-}
-
-function exportCsv() {
-  const items = calc.byDateDesc(state.allItems());
-  const rows = [['日期', '類型', '分類', '內容', '記帳人', '金額']];
-  for (const it of items) {
-    rows.push([it.date, it.type === 'income' ? '收入' : '支出', it.category, it.note || '', it.by || '', it.amount]);
-  }
-  const csv = '\uFEFF' + rows.map((r) => r.map((c) => {
-    const text = typeof c === 'string' && /^[\s]*[=+\-@]/.test(c) ? `'${c}` : String(c);
-    return `"${text.replace(/"/g, '""')}"`;
-  }).join(',')).join('\r\n');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${month}.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* ---------- 啟動 ---------- */
