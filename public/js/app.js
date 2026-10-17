@@ -28,7 +28,7 @@ const ui = {
 
 const loginScreen = initLoginScreen(ui.lock, { onKey: (key) => unlockAccount(key, true) });
 
-const TITLES = { add: '記帳', records: '明細', calendar: '行事曆', stats: '統計', billing: '月結', settings: '設定' };
+const TITLES = { add: '記帳', calendar: '行事曆', stats: '本月', billing: '年度', settings: '設定' };
 
 let view = 'add';
 let month = calc.monthKey();
@@ -158,8 +158,10 @@ function applyTheme() {
 
 /* ---------- 分頁 ---------- */
 
-function show(next) {
+/** 本月分頁（stats）上面是摘要與圖表，下面是明細；show('records') 開本月並捲到明細。 */
+function show(target) {
   if (working) return;
+  const next = target === 'records' ? 'stats' : target;
   view = next;
   for (const tab of document.querySelectorAll('.tab')) {
     tab.classList.toggle('is-on', tab.dataset.view === next);
@@ -167,7 +169,7 @@ function show(next) {
     else tab.removeAttribute('aria-current');
   }
   for (const sec of document.querySelectorAll('.view')) {
-    sec.hidden = sec.id !== `view-${next}`;
+    sec.hidden = sec.id !== `view-${next}` && !(next === 'stats' && sec.id === 'view-records');
   }
   ui.title.textContent = next === 'add' && editingId ? editTitle() : TITLES[next];
   ui.monthNav.hidden = next === 'add' || next === 'billing';
@@ -178,6 +180,7 @@ function show(next) {
   if (next === 'add') refreshFormOptions();
   if (next === 'calendar') syncNotes();
   render();
+  if (target === 'records') $('#view-records').scrollIntoView({ block: 'start' });
 }
 
 const editTitle = () => (addType === 'note' ? '編輯記事' : '編輯紀錄');
@@ -192,7 +195,6 @@ async function syncNotes() {
 function render() {
   if (view === 'stats') {
     $('#view-stats').innerHTML = views.stats(month, state.allItems(), prevItems, categoryType, settings.people());
-  } else if (view === 'records') {
     const active = document.activeElement;
     const selection = active?.id === 'record-query' ? [active.selectionStart, active.selectionEnd] : null;
     const { items, scope } = recordPool();
@@ -569,7 +571,7 @@ function recordPool() {
   if (!allLoading) {
     allLoading = reports.loadAll().then((ok) => {
       if (!ok) allLoading = null;
-      if (view === 'records' && (filters.query.trim() || filters.category)) refreshRecordResults();
+      if (view === 'stats' && (filters.query.trim() || filters.category)) refreshRecordResults();
     });
   }
   const all = { ...reports.allRecords(), [month]: state.allItems() };
