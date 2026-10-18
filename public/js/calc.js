@@ -153,6 +153,40 @@ export function daysLabel(date, today = todayKey()) {
   return diff === 0 ? '今天' : diff > 0 ? `還剩 ${diff} 天` : `距今 ${-diff} 天`;
 }
 
+/** 記事的重複週期：每週、每月。 */
+export const REPEATS = { week: '每週', month: '每月' };
+
+/** 第 n 次（從 0 起）的日期：每週加 7 天；每月同一天，那個月沒有這天就用月底（例如 31 日在 2 月是 28／29 日）。 */
+function nthDate(start, repeat, n) {
+  const [y, m, d] = start.split('-').map(Number);
+  const pad = (v) => String(v).padStart(2, '0');
+  if (repeat === 'week') {
+    const t = new Date(Date.UTC(y, m - 1, d + 7 * n));
+    return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+  }
+  const index = (y * 12 + m - 1) + n;
+  const year = Math.floor(index / 12), month = index % 12 + 1;
+  return `${year}-${pad(month)}-${pad(Math.min(d, new Date(Date.UTC(year, month, 0)).getUTCDate()))}`;
+}
+
+/** 記事在 [from, to] 之間的每一天；不重複的記事只有自己那天，重複的從起始日開始往後。 */
+export function noteDates(it, from, to) {
+  if (!REPEATS[it.repeat]) return it.date >= from && it.date <= to ? [it.date] : [];
+  const out = [];
+  // 先跳到接近 from 的那一次，避免從很久以前一步一步算。
+  let n = Math.max(0, it.repeat === 'week' ? Math.floor(daysBetween(it.date, from) / 7) : (Number(from.slice(0, 4)) - Number(it.date.slice(0, 4))) * 12 + Number(from.slice(5, 7)) - Number(it.date.slice(5, 7)) - 1);
+  for (let date = nthDate(it.date, it.repeat, n); date <= to; date = nthDate(it.date, it.repeat, ++n)) {
+    if (date >= from) out.push(date);
+  }
+  return out;
+}
+
+/** 重複記事下一次的日期（今天或以後）。 */
+export function nextNoteDate(it, today = todayKey()) {
+  if (!REPEATS[it.repeat] || it.date >= today) return it.date;
+  return noteDates(it, today, nthDate(today, it.repeat, 1))[0];
+}
+
 export const nf = new Intl.NumberFormat('zh-Hant-TW');
 export const money = (n) => nf.format(Math.round(n));
 

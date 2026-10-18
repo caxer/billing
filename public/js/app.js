@@ -550,6 +550,7 @@ function resetForm() {
   aiStatus('');
   $('#add-category-auto').hidden = true;
   $('#add-form').reset();
+  $('#add-repeat').value = '';
   renderNoteSuggest(false);
   setDate(month === calc.monthKey() ? calc.todayKey() : `${month}-01`);
   fillSelect($('#add-by'), settings.people(), me);
@@ -670,6 +671,7 @@ function editNote(id) {
   lockTypes('note');
   setDate(item.date);
   $('#add-note').value = item.note;
+  $('#add-repeat').value = item.repeat || '';
   fillSelect($('#add-by'), settings.people(), item.by);
   $('#add-submit').textContent = '更新這筆';
   $('#add-cancel').hidden = false;
@@ -679,7 +681,8 @@ function editNote(id) {
 
 /** 記事只有日期、內容、誰記的；日期不限本月，可以記未來的日子倒數。存完回行事曆看天數。 */
 async function submitNote(fail) {
-  const payload = { date: $('#add-date').value, note: $('#add-note').value.trim(), by: $('#add-by').value };
+  // 不重複時存 undefined，寫檔時就不會留 repeat 欄位。
+  const payload = { date: $('#add-date').value, note: $('#add-note').value.trim(), by: $('#add-by').value, repeat: $('#add-repeat').value || undefined };
   if (!payload.note) return fail('請填內容，例如換濾心');
   if (!calc.validDate(payload.date)) return fail('請選有效日期');
   if (!payload.by) return fail('請選記事的人');
@@ -693,7 +696,7 @@ async function submitNote(fail) {
       toast('已更新');
     } else {
       await notes.add(payload);
-      toast(`已記事 · ${calc.daysLabel(payload.date)}`);
+      toast(`已記事 · ${calc.REPEATS[payload.repeat] ? `${calc.REPEATS[payload.repeat]} · ` : ''}${calc.daysLabel(calc.nextNoteDate(payload))}`);
     }
     saved = true;
   } catch (err) {
@@ -911,6 +914,7 @@ function bind() {
 
   $('#add-form').addEventListener('submit', submitForm);
   asButtons($('#add-by'));
+  asButtons($('#add-repeat'));
   $('#add-note').addEventListener('input', () => { guessFromNote(); renderNoteSuggest(); });
   // 第一次點內容時讀全部月份，之後的提示才有以前的名稱。
   $('#add-note').addEventListener('focus', () => {

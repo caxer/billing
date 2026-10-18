@@ -224,6 +224,7 @@ export function validateNotes(items) {
         typeof it.date !== 'string' || !validDate(it.date) ||
         typeof it.note !== 'string' || !it.note.trim() ||
         (it.by !== undefined && typeof it.by !== 'string') ||
+        (it.repeat !== undefined && !['week', 'month'].includes(it.repeat)) ||
         (it.createdAt !== undefined && typeof it.createdAt !== 'string')) {
       throw new Error('記事的資料格式損毀');
     }

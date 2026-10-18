@@ -204,24 +204,31 @@ export function recordsView(items, filters, people = [], scope = '') {
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
+/** 重複的記事傳進來的 date 是那一次的日期，meta 標出每週／每月。 */
 function noteRow(it, today, count = 1) {
   const diff = calc.daysBetween(today, it.date);
+  const repeat = calc.REPEATS[it.repeat];
   return `
     <li><button type="button" class="row" data-note-id="${esc(it.id)}" aria-label="編輯記事 ${esc(it.date)} ${esc(it.note)}">
       <span class="row-main">
         <span class="row-title">${esc(it.note)}</span>
-        <span class="row-meta">${esc(it.date)}${it.by ? ` · ${esc(it.by)}` : ''}${count > 1 ? ` · 共 ${count} 次` : ''}</span>
+        <span class="row-meta">${esc(it.date)}${repeat ? ` · ${repeat}` : ''}${it.by ? ` · ${esc(it.by)}` : ''}${count > 1 ? ` · 共 ${count} 次` : ''}</span>
       </span>
       <span class="note-days${diff > 0 ? ' is-future' : diff === 0 ? ' is-today' : ''}">${calc.daysLabel(it.date, today)}</span>
       <span class="row-arrow" aria-hidden="true">›</span>
     </button></li>`;
 }
 
-/** 月曆標出有記事的日子；下面列即將到來（還剩幾天）與已過（距今幾天，同名只列最近一次）。點日子只看那天。 */
+/**
+ * 月曆標出有記事的日子（重複的記事每一次都標）；下面列即將到來（還剩幾天）與已過（距今幾天，同名只列最近一次）。
+ * 重複的記事只在即將到來列下一次。點日子只看那天。
+ */
 export function calendar(month, notes, selected = '') {
   const today = calc.todayKey();
   const byDate = new Map();
-  for (const it of notes) byDate.set(it.date, [...(byDate.get(it.date) || []), it]);
+  for (const it of notes) {
+    for (const date of calc.noteDates(it, `${month}-01`, `${month}-${String(calc.dayCount(month)).padStart(2, '0')}`)) byDate.set(date, [...(byDate.get(date) || []), { ...it, date }]);
+  }
   const [y, m] = month.split('-').map(Number);
   const cells = Array.from({ length: new Date(y, m - 1, 1).getDay() }, () => '<span></span>');
   for (let d = 1; d <= calc.dayCount(month); d++) {
@@ -237,9 +244,10 @@ export function calendar(month, notes, selected = '') {
     const list = calc.byDateDesc(byDate.get(selected) || []);
     body = list.length ? `<ul class="list">${list.map((it) => noteRow(it, today)).join('')}</ul>` : '<p class="empty">這天沒有記事</p>';
   } else {
-    const upcoming = notes.filter((it) => it.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+    const upcoming = notes.map((it) => ({ ...it, date: calc.nextNoteDate(it, today) })).filter((it) => it.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date));
     const latest = new Map();
-    for (const it of calc.byDateDesc(notes.filter((it) => it.date < today))) {
+    for (const it of calc.byDateDesc(notes.filter((it) => it.date < today && !calc.REPEATS[it.repeat]))) {
       const key = it.note.trim();
       const seen = latest.get(key);
       if (seen) seen.count++;
