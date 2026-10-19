@@ -209,6 +209,8 @@ function render() {
     $('#view-calendar').innerHTML = views.calendar(month, notes.all(), calendarDay.startsWith(month) ? calendarDay : '');
   } else if (view === 'settings') {
     renderSettings();
+  } else if (view === 'add') {
+    $('#add-recent').innerHTML = views.recentView(state.allItems(), settings.people());
   }
   ui.monthLabel.textContent =
     month === calc.monthKey() ? `${calc.monthLabel(month)}（本月）` : calc.monthLabel(month);
@@ -508,7 +510,7 @@ function setAddType(type) {
   $('#add-form').classList.toggle('is-note', type === 'note');
   $('#add-amount').required = type !== 'note';
   $('#add-category').required = type !== 'note';
-  $('#add-note').placeholder = type === 'note' ? '例如：換濾心' : '例如：全聯、麥當勞、電費';
+  $('#add-note').placeholder = type === 'note' ? '換濾心' : '全聯、麥當勞、電費';
   fillCategories(type);
   applyUtilityPayer();
   guessFromNote();
@@ -988,6 +990,11 @@ function bind() {
       $('#record-results').innerHTML = views.records(items, filters, settings.people(), scope);
     });
   }
+
+  $('#add-recent').addEventListener('click', (e) => {
+    const row = e.target.closest('.row[data-id]');
+    if (row) editRecord(row.dataset.id);
+  });
 
   $('#view-records').addEventListener('click', (e) => {
     if (e.target.closest('#record-clear-category')) { filters.category = ''; return render(); }

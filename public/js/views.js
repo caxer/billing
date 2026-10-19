@@ -200,6 +200,15 @@ export function recordsView(items, filters, people = [], scope = '') {
     </div>`;
 }
 
+/** 記帳頁下方：這個月最近新增的幾筆，點一下編輯。顏色與明細相同。 */
+export function recentView(items, people = [], limit = 4) {
+  // 新紀錄接在月檔最後；同一時間建立的，後面的較新。
+  const recent = [...items].reverse().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, limit);
+  if (!recent.length) return '';
+  const colors = new Map(colorPeople(items, people).map((p, i) => [p, personColor(i)]));
+  return `<h2 class="section-title" title="這個月最後記的 ${limit} 筆，點一下修改">最近新增</h2>${recordList(recent, colors)}`;
+}
+
 /* ---------- 行事曆：記事 ---------- */
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
