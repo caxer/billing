@@ -750,6 +750,8 @@ async function submitForm(event) {
   if (!payload.date.startsWith(month)) return fail('日期不在目前顯示的月份，請先切換月份');
   if (!payload.category) return fail('請選分類');
   if (!payload.by) return fail('請選記帳的人');
+  // 沒寫內容就用分類項目當名稱（水電氣／電費 → 電費），整理與統計不會有空白名稱。
+  if (!payload.note) payload.note = payload.category.split('／').pop();
 
   setSync('busy', '儲存中');
   setWorking(true);
