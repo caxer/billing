@@ -243,6 +243,8 @@ export const BANK_ITEMS = ['電費', '水費', '燃氣', '其他'];
 export const FUND_ITEMS = ['房', '女兒', '兒子', '日常'];
 /** 原表家用列的公、婆，依序對應記帳人名單前兩位（土銀除外）。 */
 export const FUND_SHARES = ['公', '婆'];
+/** 原表額外加入裡拿來還房貸的錢，算成當月額度（記帳改設定的額度，不記收入）。 */
+export const QUOTA_EXTRA = /結清房貸|提前還款/;
 
 /** 帳本從歷史第一年 1 月逐月走到 through；歷史截止後（含待補月份）改用交易。 */
 function* ledgerMonths({ history, cutoff, historyThrough, through }) {
@@ -336,6 +338,7 @@ export function fundLedger({ history = {}, cutoff, historyThrough, records = {},
           // 每人第一列是每月額度，其餘是額外加入；結餘與上月超支是上一期結轉。
           if (n === 0) share.quota = amount;
           else if (!amount) return;
+          else if (QUOTA_EXTRA.test(note)) share.quota += amount;
           else if (/結餘|超支/.test(note)) share.carry = { amount: (share.carry?.amount || 0) + amount, note };
           else share.extras.push({ amount, note });
         });
