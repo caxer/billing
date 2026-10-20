@@ -79,6 +79,8 @@ async function checkVersion() {
 /** 回到 App 與開著時每分鐘看一次設定，別支手機或電腦改的分類、記帳人、額度會跟著更新。 */
 async function syncSettings() {
   if (!dataReady || working || document.visibilityState === 'hidden') return;
+  // 正在設定頁輸入時不重畫，打到一半的額度才不會被清掉；下次再同步。
+  if (view === 'settings' && document.activeElement?.closest('#view-settings')) return;
   try { if (await settings.refresh()) { refreshFormOptions(); render(); } } catch { /* 斷網下次再試 */ }
 }
 setInterval(syncSettings, 60000);
@@ -342,7 +344,9 @@ async function aiCategory() {
 
 /** 把 Claude 判斷的一筆填進表單，日期在別的月份就先切過去；不自動送出，讓人確認。 */
 async function fillFromAi(entry) {
-  if (entry.date && calc.validDate(entry.date) && !entry.date.startsWith(month) && !await switchMonth(entry.date.slice(0, 7))) return;
+  if (entry.date && calc.validDate(entry.date) && !entry.date.startsWith(month) && !await switchMonth(entry.date.slice(0, 7))) {
+    throw new Error(`這筆的日期是 ${entry.date}，切換月份失敗，請再試一次`);
+  }
   setAddType(entry.type);
   if (entry.amount) $('#add-amount').value = String(entry.amount);
   if (entry.note) $('#add-note').value = sameSpelling(entry.note);
@@ -398,6 +402,8 @@ function chooseName(name) {
 
 async function runAi(request, label) {
   if (aiBusy || working) { aiStatus(''); toast('正在處理上一筆，稍後再試一次'); return; }
+  // 說一筆、拍收據一律是新增；正在編輯舊紀錄時先放掉，不然按「更新這筆」會蓋掉那筆。
+  if (editingId) resetForm();
   aiBusy = true;
   aiCategoryRun++;
   for (const id of ['#ai-voice', '#ai-photo']) $(id).disabled = true;
@@ -464,7 +470,7 @@ async function photoChosen(e) {
   try {
     aiStatus('處理照片…');
     const { blob } = await preparePhoto(file);
-    await runAi({ image: { data: await ai.blobToBase64(blob), mediaType: 'image/jpeg' } }, '收據');
+    await runAi({ image: { data: await ai.blobToBase64(blob), mediaType: blob.type || 'image/jpeg' } }, '收據');
   } catch (err) { aiStatus(''); toast(err.message || '照片處理失敗'); }
 }
 
@@ -499,6 +505,7 @@ function refreshFormOptions() {
 
 function setAddType(type) {
   addType = type;
+  aiCategoryRun++; // 換了收支或記事，進行中的 AI 分類作廢
   for (const btn of document.querySelectorAll('.seg-btn[data-type]')) {
     if (btn.hasAttribute('data-cat-switch')) continue;
     btn.classList.toggle('is-on', btn.dataset.type === type);
@@ -606,8 +613,8 @@ async function findSameName(item) {
   $('#add-same-all').checked = false;
   const note = (item.note || '').trim();
   if (!note) return;
-  await reports.loadAll();
-  if (editingId !== item.id) return;
+  // 沒讀完全部月份就不提示，免得筆數少算還以為全部改到了。
+  if (!await reports.loadAll() || editingId !== item.id) return;
   const all = { ...reports.allRecords(), [month]: state.allItems() };
   sameRecords = Object.entries(all).flatMap(([m, list]) => list
     .filter((it) => it.id !== item.id && it.type === item.type && (it.note || '').trim() === note).map((it) => ({ month: m, id: it.id })));
@@ -1064,20 +1071,12 @@ function bindSettings() {
         if (!name || name === from) return;
         if (settings.people().includes(name)) throw new Error(`已經有「${name}」了`);
         if ([UTILITY_PAYER, FUND_PAYER].includes(name)) throw new Error(`「${name}」是帳戶名稱，請換一個`);
-        await settings.save((s) => {
-          if (!s.people.includes(from)) throw new Error('這位記帳人已被修改，請同步後再試');
-          if (s.people.includes(name)) throw new Error(`已經有「${name}」了`);
-          s.people = s.people.map((p) => (p === from ? name : p));
-          if (s.budgets) {
-            if (s.budgets[from]) s.budgets[name] = s.budgets[from];
-            delete s.budgets[from];
-          }
-        });
-        if (me === from) {
-          me = name;
-          writeStored('spa-me', name);
-        }
-        // 所有月份的紀錄一起改名，歷史月份的額外收入與公積金帳才不會斷成兩個人。
+        // 所有月份的紀錄與記事一起改名，歷史月份的額外收入與公積金帳才不會斷成兩個人。
+        // 先改紀錄、最後才改名單：中途失敗時名單還是舊名字，再按一次改名就會把剩下的月份補完。
+        // 動紀錄前先重讀雲端名單，別支手機剛改過也不會改出重複的名字。
+        await settings.refresh();
+        if (!settings.people().includes(from)) throw new Error('這位記帳人已被修改，請同步後再試');
+        if (settings.people().includes(name)) throw new Error(`已經有「${name}」了`);
         const months = [...new Set([targetMonth, ...(await store.listMonths()).map((f) => f.month)])];
         const used = [];
         for (let i = 0; i < months.length; i += 6) {
@@ -1091,6 +1090,24 @@ function bindSettings() {
             if (!hits.length) return false;
             for (const it of hits) it.by = name;
           });
+        }
+        await notes.mutate((list) => {
+          const hits = list.filter((it) => it.by === from);
+          if (!hits.length) return false;
+          for (const it of hits) it.by = name;
+        });
+        await settings.save((s) => {
+          if (!s.people.includes(from)) throw new Error('這位記帳人已被修改，請同步後再試');
+          if (s.people.includes(name)) throw new Error(`已經有「${name}」了`);
+          s.people = s.people.map((p) => (p === from ? name : p));
+          if (s.budgets) {
+            if (s.budgets[from]) s.budgets[name] = s.budgets[from];
+            delete s.budgets[from];
+          }
+        });
+        if (me === from) {
+          me = name;
+          writeStored('spa-me', name);
         }
         toast(`已改成「${name}」${used.length ? `，${used.length} 個月的紀錄一起改` : ''}`);
       }

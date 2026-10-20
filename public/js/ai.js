@@ -114,5 +114,7 @@ export async function parseEntry({ text = '', image = null, categories, history 
   const entry = normalizeEntry(value, all);
   // 收入分類只配收入，支出分類只配支出。
   if (entry.category && !categories[entry.type].includes(entry.category)) entry.category = null;
+  // 民國年換算錯（115 → 2115）之類離今天一年以上的日期不採用，保留表單原日期。
+  if (entry.date && today && Math.abs(Date.parse(entry.date) - Date.parse(today)) > 400 * 86400000) entry.date = null;
   return entry;
 }
