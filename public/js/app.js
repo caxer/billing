@@ -747,12 +747,15 @@ async function submitForm(event) {
 
   if (!payload.amount) return fail('請輸入大於 0 的整數金額（可含千分位逗號）');
   if (!calc.validDate(payload.date)) return fail('請選有效日期');
-  if (!payload.date.startsWith(month)) return fail('日期不在目前顯示的月份，請先切換月份');
   if (!payload.category) return fail('請選分類');
   if (!payload.by) return fail('請選記帳的人');
   // 沒寫內容就用分類項目當名稱（水電氣／電費 → 電費），整理與統計不會有空白名稱。
   if (!payload.note) payload.note = payload.category.split('／').pop();
 
+  // 日期不在目前顯示的月份時，紀錄存進日期所在的月份（編輯則搬過去）。
+  const target = payload.date.slice(0, 7);
+  const elsewhere = target === month ? ''
+    : `到 ${target.slice(0, 4) === month.slice(0, 4) ? `${Number(target.slice(5))} 月` : calc.monthLabel(target)}`;
   setSync('busy', '儲存中');
   setWorking(true);
   $('#add-submit').textContent = '儲存中…';
@@ -761,11 +764,12 @@ async function submitForm(event) {
       const original = structuredClone(state.allItems().find((it) => it.id === editingId));
       if (!await state.update(editingId, payload)) throw new Error('這筆紀錄已被刪除，請重新整理後確認');
       const together = $('#add-same-all').checked && sameRecords.length ? await applyToSameName(original, payload) : 0;
-      toast(together ? `已更新，同名的 ${together} 筆一起改` : '已更新');
+      toast(`${elsewhere ? `已移${elsewhere}` : '已更新'}${together ? `，同名的 ${together} 筆一起改` : ''}`);
     } else {
       await state.add(payload);
-      toast(`已記下 ${payload.type === 'income' ? '+' : '−'}${calc.money(payload.amount)}`);
+      toast(`已記${elsewhere || '下'} ${payload.type === 'income' ? '+' : '−'}${calc.money(payload.amount)}`);
     }
+    if (elsewhere) reports.refresh();
     resetForm();
     afterWrite();
   } catch (err) {

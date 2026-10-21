@@ -87,10 +87,10 @@ async function writeMutation(target, fn) {
   throw new Error('另一支手機正在修改，請稍後再試一次');
 }
 
-/** 新增一筆。呼叫端必須給 date、amount、category、by、type。 */
+/** 新增一筆，存進日期所在的月份。呼叫端必須給 date、amount、category、by、type。 */
 export const add = (entry) => {
   const record = { ...entry, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
-  return mutate((list) => list.push(record));
+  return mutateMonth(entry.date.slice(0, 7), (list) => list.push(record));
 };
 
 /** 依 id 移除或更新；找不到回傳 false。 */
@@ -100,8 +100,33 @@ export const remove = (id) => mutate((list) => {
   list.splice(i, 1);
 });
 
-export const update = (id, patch) => mutate((list) => {
-  const it = list.find((x) => x.id === id);
+export async function update(id, patch) {
+  const from = month;
+  const target = patch.date?.slice(0, 7) ?? from;
+  if (target === from) {
+    return mutateMonth(from, (list) => {
+      const it = list.find((x) => x.id === id);
+      if (!it) return false;
+      Object.assign(it, patch);
+    });
+  }
+  // 日期改到別的月份：先寫進新月份再從原月份移除，中途失敗頂多多一筆，不會遺失。
+  const it = items.find((x) => x.id === id);
   if (!it) return false;
-  Object.assign(it, patch);
-});
+  const moved = { ...structuredClone(it), ...patch };
+  await mutateMonth(target, (list) => list.push(moved));
+  const removed = await mutateMonth(from, (list) => {
+    const i = list.findIndex((x) => x.id === id);
+    if (i < 0) return false;
+    list.splice(i, 1);
+  });
+  // 原紀錄已被另一支手機刪掉：撤回剛寫進新月份的那筆。
+  if (!removed) {
+    await mutateMonth(target, (list) => {
+      const i = list.findIndex((x) => x.id === id);
+      if (i < 0) return false;
+      list.splice(i, 1);
+    });
+  }
+  return removed;
+}
