@@ -10,6 +10,7 @@ import { readStored, writeStored, removeStored } from './storage.js';
 import { classify, GROUPS, UTILITY_PAYER, FUND_PAYER, guessCategory } from './billing.js';
 import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
+import './open-guide.js';
 import * as ai from './ai.js';
 import { preparePhoto } from './photo.js';
 import { asButtons, enhance } from './choices.js';
@@ -1203,10 +1204,13 @@ async function boot() {
   notes.onChange(() => { if (!working && view === 'calendar') render(); });
   if (store.isLocal()) return start();
   store.clearLegacy();
+  // LINE 等內建瀏覽器帶著連結開啟：先請使用者改用瀏覽器，選「先在這裡使用」才讀金鑰。
+  await OpenGuide.gate();
   let found;
   try { found = await LinkKey.current(); } catch (err) { return showLock(err.message); }
   if (!found) return showLock('');
   await unlockAccount(found.key, found.fresh);
+  if (!ui.app.hidden) OpenGuide.afterLogin({ fresh: found.fresh });
 }
 
 boot();
