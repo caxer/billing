@@ -3,6 +3,7 @@ import * as billing from './billing.js';
 import { monthKey, money } from './calc.js';
 import { ReportCharts } from './report-charts.js';
 import { esc } from './html.js';
+import { expenseTile } from './views.js';
 const amount = (n) => n === null || n === undefined ? '—' : money(n);
 const METRICS = [['house', '房'], ['daughter', '女兒'], ['son', '兒子'], ['daily', '扣除列項後開銷'], ['utilities', '水電氣'], ['monthlyTotal', '月消費總額（不含水電氣）'], ['total', '家庭總支出']];
 // 欄位怎麼算放在表頭提示，不佔版面。
@@ -53,6 +54,9 @@ export function init(element, getters) {
     const toggle = e.target.closest('[data-year-group]');
     if (toggle) { const name = toggle.dataset.yearGroup; if (!openGroups.delete(name)) openGroups.add(name); draw(); return; }
     const monthButton = e.target.closest('[data-billing-month]');
+    // 即時記帳的月份到本月分頁看，和那裡的分類佔比、明細同一份；歷史與待補月份才在這裡列。
+    const opened = monthButton && monthsFor(year).find((m) => m.month === monthButton.dataset.billingMonth);
+    if (opened?.source === 'transactions' && opened.month <= monthKey()) { context.openMonth?.(opened.month); return; }
     if (monthButton) { detailMonth = monthButton.dataset.billingMonth; draw(); root.querySelector('#billing-detail')?.scrollIntoView({ block: 'nearest' }); }
   });
   root.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-search]')) { e.preventDefault(); e.target.click(); } });
@@ -162,10 +166,8 @@ function draw() {
 
 function summaryTiles(totals, label, previous) {
   const pct = billing.percentChange(totals.total, previous?.total);
-  return `<div class="tiles billing-tiles">
-    ${[['家庭總支出', totals.total], ['月消費總額（不含水電氣）', totals.monthlyTotal], ['扣除列項後開銷', totals.daily], ['水電氣', totals.utilities]].map(([name, value]) =>
-      `<div class="tile"><div class="tile-label">${name}</div><div class="tile-value">${amount(value)}</div></div>`).join('')}
-    <p class="tile-period">${esc(label)}${previous && pct !== null ? ` · 去年同期 ${amount(previous.total)}` : ''}</p></div>`;
+  // 和本月的支出格同一個減法，年度只是把月份加總。
+  return `<div class="tiles billing-tiles billing-summary">${expenseTile('家庭總支出', amount(totals.total), { text: `${label}${previous && pct !== null ? ` · 去年同期 ${amount(previous.total)}` : ''}` }, totals, amount)}</div>`;
 }
 
 const signed = (n) => `${n > 0 ? '+' : '−'}${money(Math.abs(n))}`;
@@ -327,8 +329,8 @@ function yearTable(months, n, totals) {
     return `<tbody>${head}${body}</tbody>`;
   };
   const total = (key, label, tip) => `<tbody><tr class="report-total" data-total="${key}"><th scope="row" title="${tip}">${label}</th>${cells((m) => m[key], false)}<td class="year-sum">${amount(totals[key])}</td></tr></tbody>`;
-  const head = months.map((m, i) => `<th scope="col"${i >= n ? ' class="is-future"' : ''} title="${i >= n ? '未到月份' : `${sourceLabel(m.source)}，點開看當月明細`}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1}月</button>${i < n && ['pending', 'missing'].includes(m.source) ? `<small>${sourceLabel(m.source)}</small>` : ''}</th>`).join('');
-  return `<div class="card"><h3 class="section-title" title="點大項看底下的項目，點月份看當月明細">年度明細</h3>
+  const head = months.map((m, i) => `<th scope="col"${i >= n ? ' class="is-future"' : ''} title="${i >= n ? '未到月份' : m.source === 'transactions' ? '到本月看這個月' : `${sourceLabel(m.source)}，點開看當月明細`}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1}月</button>${i < n && ['pending', 'missing'].includes(m.source) ? `<small>${sourceLabel(m.source)}</small>` : ''}</th>`).join('');
+  return `<div class="card"><h3 class="section-title" title="點大項看底下的項目，點月份看那個月">年度明細</h3>
     <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動年度明細"><table class="report-table year-table"><thead><tr><th scope="col">項目</th>${head}<th scope="col">合計</th></tr></thead>
       ${YEAR_GROUPS.map(group).join('')}
       ${total('monthlyTotal', '月消費總額<small>不含水電氣</small>', '房、女兒、兒子與日常')}
@@ -343,9 +345,8 @@ function detailView(m) {
   if (m.source === 'missing') return `<div class="card" id="billing-detail"><h3>${m.month}</h3><p class="empty">沒有歷史月結資料</p></div>`;
   if (m.source === 'pending') return `<div class="card" id="billing-detail"><h3>${m.month} 待補月結</h3><p class="setting-hint">不計入年度合計${m.testCount ? ` · ${m.testCount} 筆測試交易` : ''}</p>${m.testCount ? '<button class="btn-quiet" type="button" id="billing-show-records">查看測試交易</button>' : ''}</div>`;
   const lines = (m.details || []).filter((d) => d.amount || d.note);
-  return `<div class="card" id="billing-detail"><h3 class="section-title"${m.source === 'history' ? ' title="保留原始列與備註，各列不再相加"' : ''}>${m.month} ${m.source === 'history' ? '原月結明細' : '分類明細'}</h3>
+  return `<div class="card" id="billing-detail"><h3 class="section-title" title="保留原始列與備註，各列不再相加">${m.month} 原月結明細</h3>
     ${lines.length ? lines.map((d) => `<div class="setting-row"><div><div class="setting-name">${esc(d.item)}</div><p class="setting-hint">${esc(d.group)}${d.note ? ` · ${esc(d.note)}` : ''}</p></div><strong>${amount(d.amount)}</strong></div>`).join('') : '<p class="empty">這個月沒有費用紀錄</p>'}
-    ${m.source === 'transactions' ? '<button class="btn-quiet" type="button" id="billing-show-records">查看當月交易</button>' : ''}
   </div>`;
 }
 

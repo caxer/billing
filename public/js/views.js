@@ -5,11 +5,11 @@ import { budgetFor, all as allSettings } from './settings.js';
 import { transactionSummary, UTILITY_PAYER, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
 import { esc } from './html.js';
 
-const tile = (label, value, mod, sub, extra = '') => `
+const tile = (label, value, mod, sub) => `
   <div class="tile">
     <div class="tile-label">${esc(label)}</div>
     <div class="tile-value ${mod}">${esc(value)}</div>
-    ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}${extra}
+    ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}
   </div>`;
 
 const changeSub = (cur, prev) => {
@@ -83,16 +83,24 @@ function recordRow(it, color) {
 
 const recordList = (items, colors) => `<ul class="list">${items.map((it) => recordRow(it, colors.get(it.by || ''))).join('')}</ul>`;
 
-/* ---------- 統計：支出的月結組成 ---------- */
+/* ---------- 月結減法：本月支出與年度月表共用 ---------- */
 
-function expenseParts(items) {
-  const summary = transactionSummary(items, allSettings()?.billingGroups);
-  const part = (name, total, tip) => `<span${tip ? ` title="${tip}"` : ''}>${name} <b>${calc.money(total)}</b></span>`;
-  return `<div class="tile-parts">
-      ${part('水電氣', summary.utilities)}${part('月消費總額', summary.monthlyTotal, '房、女兒、兒子與日常')}
-      <div class="tile-parts-sub">${part('房', summary.house)}${part('女兒', summary.daughter)}${part('兒子', summary.son)}${part('日常', summary.daily, '月消費總額 − 房 − 女兒 − 兒子')}</div>
-    </div>`;
-}
+const LEDGER = [['', '月消費總額', 'monthlyTotal', '房、女兒、兒子與日常，不含水電氣'], ['−', '房', 'house'], ['−', '女兒', 'daughter'], ['−', '兒子', 'son'],
+  ['=', '日常', 'daily', '扣除列項後開銷'], ['', '水電氣', 'utilities', '土銀扣款，另計']];
+
+/** 月消費總額減房、女兒、兒子等於日常，水電氣另列；format 讓年度的缺資料顯示「—」。 */
+export const ledger = (summary, format = calc.money) => `<div class="ledger">${LEDGER.map(([op, name, key, tip]) =>
+  `<div class="ledger-row${op === '=' ? ' is-result' : ''}${key === 'utilities' ? ' is-apart' : ''}"${tip ? ` title="${tip}"` : ''}><span class="ledger-op">${op}</span><span>${name}</span><b>${format(summary[key])}</b></div>`).join('')}</div>`;
+
+/** 支出格：左邊總額，右邊月結減法。 */
+export const expenseTile = (label, value, sub, summary, format) => `
+  <div class="tile tile-ledger">
+    <div class="tile-main">
+      <div class="tile-label">${esc(label)}</div>
+      <div class="tile-value is-expense">${esc(value)}</div>
+      ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}
+    </div>${ledger(summary, format)}
+  </div>`;
 
 /* ---------- 統計 ---------- */
 
@@ -136,7 +144,7 @@ export function stats(month, items, prevItems, categoryType, people = []) {
   return `
     <div class="stack stats-grid">
       <div class="tiles stats-tiles">
-        ${tile('支出', calc.money(expense), 'is-expense', changeSub(expense, previous.expense), expenseParts(items))}
+        ${expenseTile('支出', calc.money(expense), changeSub(expense, previous.expense), transactionSummary(items, allSettings()?.billingGroups))}
         ${tile('收入', calc.money(income), 'is-income', changeSub(income, previous.income))}
       </div>
       ${budgetCard(items, month, people)}

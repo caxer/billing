@@ -9,7 +9,7 @@ export const STACK_GROUPS = [
   { key: 'house', name: '房', color: '#4ade80' },
   { key: 'daughter', name: '女兒', color: '#f472b6' },
   { key: 'son', name: '兒子', color: '#a78bfa' },
-  { key: 'daily', name: '扣除列項後開銷', color: '#fbbf24' },
+  { key: 'daily', name: '日常', color: '#fbbf24' },
 ];
 const ITEMS = {
   房: ['還款', '房貸', '管理', '火險', '房屋', '地價', '網路', '其他'],
