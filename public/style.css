@@ -248,7 +248,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .tile-income { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 .tile-income b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .tile-income b.is-income { color: var(--income); }
-.tile-income .tile-sub { margin-top: 0; }
+.tile-income .tile-sub { flex-basis: 100%; margin-top: 0; }
 .tile-ledger { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px; }
 .tile-ledger .tile-main { flex: 1 1 110px; min-width: 0; }
 .ledger { flex: 1 1 180px; max-width: 280px; font-size: 13px; color: var(--muted); }
