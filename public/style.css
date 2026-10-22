@@ -243,13 +243,12 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .tile-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .tile-sub.is-up { color: var(--danger); }
 .tile-sub.is-down { color: var(--income); }
-/* 本月：支出格左邊總額、右邊月結減法；收入只有一格。年度月表共用同一個支出格。 */
+/* 本月：支出格左邊總額、下面接收入，右邊月結減法。年度月表共用同一個支出格。 */
 .stats-tiles { grid-template-columns: 1fr; }
-/* 手機上收入一行就好，把高度留給支出的減法。 */
-@media (max-width: 759px) {
-  .stats-tiles > .tile:not(.tile-ledger) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
-  .stats-tiles > .tile:not(.tile-ledger) .tile-value { margin-top: 0; }
-}
+.tile-income { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.tile-income b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.tile-income b.is-income { color: var(--income); }
+.tile-income .tile-sub { margin-top: 0; }
 .tile-ledger { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px; }
 .tile-ledger .tile-main { flex: 1 1 110px; min-width: 0; }
 .ledger { flex: 1 1 180px; max-width: 280px; font-size: 13px; color: var(--muted); }
@@ -523,7 +522,6 @@ select { padding-right: 34px; }
   main { padding: 24px 28px 100px; }
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
   .tiles, .records-section { grid-column: 1 / -1; }
-  .stats-tiles { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
   .tile { padding: 20px; }
   .tile-value { font-size: 30px; margin-top: 6px; }
   .card { padding: 20px; }

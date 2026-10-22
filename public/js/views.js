@@ -5,13 +5,6 @@ import { budgetFor, all as allSettings } from './settings.js';
 import { transactionSummary, UTILITY_PAYER, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
 import { esc } from './html.js';
 
-const tile = (label, value, mod, sub) => `
-  <div class="tile">
-    <div class="tile-label">${esc(label)}</div>
-    <div class="tile-value ${mod}">${esc(value)}</div>
-    ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}
-  </div>`;
-
 const changeSub = (cur, prev) => {
   if (prev === 0) return null;
   const pct = calc.changePercent(cur, prev);
@@ -92,15 +85,17 @@ const LEDGER = [['', '月消費總額', 'monthlyTotal', '房、女兒、兒子�
 export const ledger = (summary, format = calc.money) => `<div class="ledger">${LEDGER.map(([op, name, key, tip]) =>
   `<div class="ledger-row${op === '=' ? ' is-result' : ''}${key === 'utilities' ? ' is-apart' : ''}"${tip ? ` title="${tip}"` : ''}><span class="ledger-op">${op}</span><span>${name}</span><b>${format(summary[key])}</b></div>`).join('')}</div>`;
 
-/** 支出格：左邊總額，右邊月結減法。 */
-export const expenseTile = (label, value, sub, summary, format) => `
+/** 支出格：左邊總額（本月在下面接收入），右邊月結減法。 */
+export const expenseTile = (label, value, sub, summary, format, below = '') => `
   <div class="tile tile-ledger">
     <div class="tile-main">
       <div class="tile-label">${esc(label)}</div>
       <div class="tile-value is-expense">${esc(value)}</div>
-      ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}
+      ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}${below}
     </div>${ledger(summary, format)}
   </div>`;
+
+const incomeLine = (income, sub) => `<div class="tile-income"><span class="tile-label">收入</span><b class="is-income">${calc.money(income)}</b>${sub ? `<span class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</span>` : ''}</div>`;
 
 /* ---------- 統計 ---------- */
 
@@ -144,8 +139,7 @@ export function stats(month, items, prevItems, categoryType, people = []) {
   return `
     <div class="stack stats-grid">
       <div class="tiles stats-tiles">
-        ${expenseTile('支出', calc.money(expense), changeSub(expense, previous.expense), transactionSummary(items, allSettings()?.billingGroups))}
-        ${tile('收入', calc.money(income), 'is-income', changeSub(income, previous.income))}
+        ${expenseTile('支出', calc.money(expense), changeSub(expense, previous.expense), transactionSummary(items, allSettings()?.billingGroups), calc.money, incomeLine(income, changeSub(income, previous.income)))}
       </div>
       ${budgetCard(items, month, people)}
 
