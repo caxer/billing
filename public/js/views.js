@@ -5,11 +5,11 @@ import { budgetFor, all as allSettings } from './settings.js';
 import { transactionSummary, UTILITY_PAYER, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
 import { esc } from './html.js';
 
-const tile = (label, value, mod, sub) => `
+const tile = (label, value, mod, sub, extra = '') => `
   <div class="tile">
     <div class="tile-label">${esc(label)}</div>
     <div class="tile-value ${mod}">${esc(value)}</div>
-    ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}
+    ${sub ? `<div class="tile-sub ${sub.cls || ''}">${esc(sub.text)}</div>` : ''}${extra}
   </div>`;
 
 const changeSub = (cur, prev) => {
@@ -83,15 +83,15 @@ function recordRow(it, color) {
 
 const recordList = (items, colors) => `<ul class="list">${items.map((it) => recordRow(it, colors.get(it.by || ''))).join('')}</ul>`;
 
-/* ---------- 統計：本月月結與額度 ---------- */
+/* ---------- 統計：支出的月結組成 ---------- */
 
-function billingCard(items) {
+function expenseParts(items) {
   const summary = transactionSummary(items, allSettings()?.billingGroups);
-  // 家庭總支出就是上方的支出，水電氣在分類佔比，這裡只列月消費總額與它的組成。
-  return `<div class="card billing-month-card"><div class="budget-head"><span class="budget-title">本月月結</span>
-      <span class="budget-num" title="房、女兒、兒子與日常；不含水電氣">月消費總額 ${calc.money(summary.monthlyTotal)}</span></div>
-    <div class="billing-mini-grid">${[['日常', summary.daily, '扣除列項後開銷'], ['房', summary.house], ['女兒', summary.daughter], ['兒子', summary.son]].map(([name, total, tip]) =>
-      `<div${tip ? ` title="${tip}"` : ''}><span class="setting-hint">${name}</span><strong>${calc.money(total)}</strong></div>`).join('')}</div></div>`;
+  const part = (name, total, tip) => `<span${tip ? ` title="${tip}"` : ''}>${name} <b>${calc.money(total)}</b></span>`;
+  return `<div class="tile-parts">
+      ${part('水電氣', summary.utilities)}${part('月消費總額', summary.monthlyTotal, '房、女兒、兒子與日常')}
+      <div class="tile-parts-sub">${part('房', summary.house)}${part('女兒', summary.daughter)}${part('兒子', summary.son)}${part('日常', summary.daily, '月消費總額 − 房 − 女兒 − 兒子')}</div>
+    </div>`;
 }
 
 /* ---------- 統計 ---------- */
@@ -106,7 +106,7 @@ const stackSeg = (bucket, person, index, stackTotal) => {
 export function stats(month, items, prevItems, categoryType, people = []) {
   // 舊紀錄保留原記帳人，即使名單刪除或改名也不能從圖表消失。
   const recordPeople = colorPeople(items, people);
-  const { expense, income, net } = calc.summarize(items);
+  const { expense, income } = calc.summarize(items);
   const previous = calc.summarize(prevItems);
   const spent = calc.byDay(items, month, 'expense');
   // 只畫支出；收入資料照常記錄，但不在這張圖上呈現。
@@ -135,12 +135,10 @@ export function stats(month, items, prevItems, categoryType, people = []) {
 
   return `
     <div class="stack stats-grid">
-      <div class="tiles">
-        ${tile('支出', calc.money(expense), 'is-expense', changeSub(expense, previous.expense))}
+      <div class="tiles stats-tiles">
+        ${tile('支出', calc.money(expense), 'is-expense', changeSub(expense, previous.expense), expenseParts(items))}
         ${tile('收入', calc.money(income), 'is-income', changeSub(income, previous.income))}
-        ${tile('淨額', calc.signedMoney(net), net < 0 ? 'is-expense' : 'is-income')}
       </div>
-      ${billingCard(items)}
       ${budgetCard(items, month, people)}
 
       <div class="card">
