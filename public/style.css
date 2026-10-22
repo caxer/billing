@@ -527,12 +527,10 @@ select { padding-right: 34px; }
 
 /* 月結沿用帳本的色彩與卡片；寬表只在自己的容器內捲動。 */
 .billing-month-card { grid-column: 1 / -1; }
-.billing-mini-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
+.billing-mini-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .billing-mini-grid > div { display: flex; flex-direction: column; }
 .billing-mini-grid .setting-hint { display: block; font-size: 11px; line-height: 1.3; word-break: keep-all; overflow-wrap: anywhere; }
 .billing-mini-grid strong { display: block; margin-top: auto; font-size: clamp(15px, 4.2vw, 24px); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.billing-parts { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 8px 0 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
-.billing-parts b { color: var(--text); margin-left: 5px; }
 .billing-layout { min-width: 0; }
 .billing-layout > *, #billing-content > * { min-width: 0; }
 .report-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }

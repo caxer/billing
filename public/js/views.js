@@ -87,10 +87,11 @@ const recordList = (items, colors) => `<ul class="list">${items.map((it) => reco
 
 function billingCard(items) {
   const summary = transactionSummary(items, allSettings()?.billingGroups);
-  return `<div class="card billing-month-card"><div class="budget-head"><span class="budget-title">本月月結</span></div>
-    <div class="billing-mini-grid">${[['月消費總額（不含水電氣）', summary.monthlyTotal, '含房與子女'], ['扣除列項後開銷', summary.daily, '日常'], ['水電氣', summary.utilities, '另計'], ['家庭總支出', summary.total, '月消費總額＋水電氣']].map(([name, total, tip]) =>
-      `<div title="${tip}"><span class="setting-hint">${name}</span><strong>${calc.money(total)}</strong></div>`).join('')}</div>
-    <div class="billing-parts">${[['房', summary.house], ['女兒', summary.daughter], ['兒子', summary.son]].map(([name, total]) => `<span>${name} <b>${calc.money(total)}</b></span>`).join('')}</div></div>`;
+  // 家庭總支出就是上方的支出，水電氣在分類佔比，這裡只列月消費總額與它的組成。
+  return `<div class="card billing-month-card"><div class="budget-head"><span class="budget-title">本月月結</span>
+      <span class="budget-num" title="房、女兒、兒子與日常；不含水電氣">月消費總額 ${calc.money(summary.monthlyTotal)}</span></div>
+    <div class="billing-mini-grid">${[['日常', summary.daily, '扣除列項後開銷'], ['房', summary.house], ['女兒', summary.daughter], ['兒子', summary.son]].map(([name, total, tip]) =>
+      `<div${tip ? ` title="${tip}"` : ''}><span class="setting-hint">${name}</span><strong>${calc.money(total)}</strong></div>`).join('')}</div></div>`;
 }
 
 /* ---------- 統計 ---------- */
