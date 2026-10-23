@@ -10,7 +10,7 @@ export class ReportCharts {
     this.root = root; this.context = context; this.models = new Map(); this.selectedPoints = new Map();
     this.options = { monthly: { average: true, cumulative: true, extrema: true }, growth: { average: true, cumulative: false, extrema: true } };
     this.hidden = { monthly: new Set(), growth: new Set() };
-    this.ranges = { monthly: {}, growth: {} };
+    this.ranges = { growth: {} };
     this.growthMode = 'annual'; this.search = ''; this.selectedItems = new Set([itemKey('總覽', '家庭總支出')]);
     root.addEventListener('click', (e) => {
       const toggle = e.target.closest('[data-chart-option]');
@@ -48,7 +48,8 @@ export class ReportCharts {
     const hit = e.target.closest('[data-chart-point]');
     if (!hit) return;
     const model = this.models.get(hit.dataset.chartId), index = Number(hit.dataset.chartPoint);
-    if (!model?.points[index]) return;
+    // 單年走勢不放提示框，柱子只靠 title 顯示當月合計。
+    if (!model?.points[index] || !this.root.querySelector(`#${hit.dataset.chartId}-tooltip`)) return;
     this.selectedPoints.set(hit.dataset.chartId, model.points[index].key);
     this.root.querySelector(`#${hit.dataset.chartId}-tooltip`).innerHTML = model.tooltip(index);
   }
@@ -101,17 +102,17 @@ export class ReportCharts {
       <select id="${id}-range-end" aria-label="範圍結束" data-chart-id="${id}" data-chart-range="end">${points.map((p, i) => `<option value="${esc(p.key)}"${i === selected.end ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select><button type="button" id="${id}-range-reset" class="btn-quiet" data-range-reset="${id}" aria-label="重設範圍" title="重設範圍">重設</button></div>`;
   }
 
-  plot(id, points, annual) {
+  plot(id, points, annual, tooltip = true) {
     const groups = STACK_GROUPS.filter((g) => !this.hidden[id].has(g.key));
     const model = stackedChart(points, groups, { ...this.options[id], annual, id });
     this.models.set(id, { ...model, points });
-    return `${this.legend(id)}${model.html}<div class="chart-tooltip" id="${id}-tooltip" role="status" title="點柱子看各分類金額">${annual ? '年均' : '月均'} ${model.stats.average === null ? '—' : money(model.stats.average)}</div>`;
+    return `${this.legend(id)}${model.html}${tooltip ? `<div class="chart-tooltip" id="${id}-tooltip" role="status" title="點柱子看各分類金額">${annual ? '年均' : '月均'} ${model.stats.average === null ? '—' : money(model.stats.average)}</div>` : ''}`;
   }
 
   monthly(year) {
-    const points = this.monthPoints(year), selected = this.range(points, 'monthly');
+    // 一年只有 12 個月，不需要範圍選擇；各月分類金額看下面的年度明細。
     return `<div class="card chart-card"><div class="section-head"><h3 class="section-title">${year} 支出走勢</h3>${this.controls('monthly')}</div>
-      ${this.plot('monthly', selected.visible, false)}${this.rangeControls(points, selected, 'monthly')}</div>`;
+      ${this.plot('monthly', this.monthPoints(year), false, false)}</div>`;
   }
 
   itemOptions() {
