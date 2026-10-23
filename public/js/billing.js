@@ -87,6 +87,9 @@ export function guessCategory(note, type, history = [], allowed = [], keywords =
   return null;
 }
 
+/** 支出算進的大項：記帳時存下的歸屬優先，否則依分類判斷。 */
+export const expenseGroup = (it, mappings = {}) => GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
+
 export function upgradeSettings(value) {
   const next = structuredClone(value);
   if (!next.billingVersion) {
@@ -125,7 +128,7 @@ export function transactionSummary(items, mappings = {}) {
       continue;
     }
     if (it.type !== 'expense') continue;
-    const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
+    const group = expenseGroup(it, mappings);
     result[keys[group]] += it.amount;
     const key = JSON.stringify([group, it.category]);
     const detail = details.get(key) || { group, item: it.category, amount: 0, note: '' };
@@ -280,9 +283,9 @@ export function bankLedger({ history = {}, cutoff, historyThrough, records = {},
       for (const it of records[month] || []) {
         if (it.by !== UTILITY_PAYER) continue;
         if (isAdjustment(it)) { entry.adjust = addAdjust(entry.adjust, it); continue; }
-        if (it.type === 'income') entry.incomes.push({ amount: it.amount, note: it.note || it.category });
+        if (it.type === 'income') entry.incomes.push({ amount: it.amount, note: it.note || it.category, date: it.date });
         if (it.type !== 'expense') continue;
-        const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
+        const group = expenseGroup(it, mappings);
         const item = group === '水電氣' ? it.category.split('／')[1] : null;
         entry.expenses[BANK_ITEMS.includes(item) ? item : '其他'] += it.amount;
       }
@@ -348,7 +351,7 @@ export function fundLedger({ history = {}, cutoff, historyThrough, records = {},
       for (const share of shares) {
         if (!share.member) continue;
         share.quota = quotaFor(share.member, month);
-        share.extras = items.filter((it) => it.type === 'income' && it.by === share.member && !isAdjustment(it)).map((it) => ({ amount: it.amount, note: it.note || it.category }));
+        share.extras = items.filter((it) => it.type === 'income' && it.by === share.member && !isAdjustment(it)).map((it) => ({ amount: it.amount, note: it.note || it.category, date: it.date }));
       }
       const t = transactionSummary(items, mappings);
       // 自己付的水電氣不經土銀，跟日常一起由公積金支付。
@@ -405,7 +408,7 @@ export function shareSummary(items, mappings = {}, top = 10, by = 'amount', pick
   for (const it of items) {
     if (it.type !== 'expense' || isAdjustment(it)) continue;
     categories.set(it.category, (categories.get(it.category) || 0) + it.amount);
-    const group = GROUPS.includes(it.billingGroup) ? it.billingGroup : classify(it.category, mappings);
+    const group = expenseGroup(it, mappings);
     groupOf.set(it.category, group);
     groupTotals.set(group, (groupTotals.get(group) || 0) + it.amount);
     if (GROUPS.includes(pick) ? group !== pick : it.category !== pick) continue;

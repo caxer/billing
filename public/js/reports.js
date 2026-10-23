@@ -1,6 +1,6 @@
 import * as store from './store.js';
 import * as billing from './billing.js';
-import { monthKey, money } from './calc.js';
+import { monthKey, money, isAdjustment } from './calc.js';
 import { ReportCharts } from './report-charts.js';
 import { esc } from './html.js';
 import { expenseTile } from './views.js';
@@ -13,6 +13,7 @@ let charts;
 /** 年度明細展開的大項，重畫時保留。 */
 const openGroups = new Set();
 const monthCache = new Map();
+const entryCache = new Map();
 
 export function init(element, getters) {
   root = element;
@@ -122,6 +123,7 @@ function draw() {
   if (!root) return;
   // 一次呈現共用年度計算結果；下一次呈現再讀取最新設定與交易。
   monthCache.clear();
+  entryCache.clear();
   const select = root.querySelector('#billing-year');
   const years = allYears();
   if (JSON.stringify([...select.options].map((o) => o.value)) !== JSON.stringify(years)) {
@@ -183,6 +185,38 @@ function utilityBudgetView({ expense: spent, missing }) {
 
 const ledgerSource = () => ({ history: archive?.data, cutoff: billing.reportCutoff(archive), historyThrough: billing.historyEnd(archive),
   records, mappings: context.settings()?.billingGroups, through: monthKey() });
+/* ---------- 加總格的提示：月份格逐筆列日期、內容、金額；跨月的合計格列各月金額 ---------- */
+const TIP_MAX = 40;
+const fmt = (n) => `${n < 0 ? '−' : ''}${money(Math.abs(n))}`;
+const tipAttr = (tip) => tip ? ` title="${esc(tip)}"` : '';
+const day = (date) => String(date || '').slice(5).replace('-', '/');
+
+/** 某月算進月結的交易（同 transactionSummary）：標上大項、項目與帶號金額，公積金名下的收入抵扣日常。 */
+function monthEntries(month) {
+  if (!entryCache.has(month)) {
+    const mappings = context.settings()?.billingGroups;
+    entryCache.set(month, (records[month] || []).flatMap((it) => {
+      const income = it.type === 'income';
+      if (isAdjustment(it) || (income ? it.by !== billing.FUND_PAYER : it.type !== 'expense')) return [];
+      const group = income ? '日常' : billing.expenseGroup(it, mappings);
+      const item = it.category.startsWith(`${group}／`) ? it.category.slice(group.length + 1) : it.category;
+      return [{ date: it.date, by: it.by, note: it.note, group, item, amount: income ? -it.amount : it.amount }];
+    }));
+  }
+  return entryCache.get(month);
+}
+
+/** 逐筆依日期列出；列本身已是單一項目時 withItem 為 false，不重複寫項目。 */
+function entriesTip(list, withItem = true) {
+  const sorted = [...list].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const lines = sorted.slice(0, TIP_MAX).map((e) => [day(e.date), withItem && e.item, e.note, fmt(e.amount)].filter(Boolean).join(' '));
+  if (sorted.length > TIP_MAX) lines.push(`…另 ${sorted.length - TIP_MAX} 筆`);
+  return lines.join('\n');
+}
+
+/** 跨月合計格：[月份, 金額] 逐月列出，0 與缺資料略過。 */
+const monthsTip = (pairs) => pairs.filter(([, v]) => v).map(([month, v]) => `${Number(month.slice(5))}月 ${fmt(v)}`).join('\n');
+
 const sourceTitle = (m) => m.source === 'history' ? '歷史月結' : m.source === 'missing' ? '缺少歷史' : '即時記帳';
 
 /** 占比：所選年度或全部年度的大項、分類占比，以及日常內容 Top 10（例如全聯）。 */
@@ -218,17 +252,20 @@ function fundView() {
     if (m.source === 'missing') return '<td>—</td>';
     const extra = sh.extras.reduce((s, e) => s + e.amount, 0);
     const tip = [sh.member && sh.member !== sh.name ? sh.member : '', `額度 ${money(sh.quota)}`, sh.carry && `${sh.carry.note} ${money(sh.carry.amount)}`,
-      ...sh.extras.map((e) => `${e.note || '額外'} ${money(e.amount)}`)].filter(Boolean).join('、');
+      ...sh.extras.map((e) => [day(e.date), e.note || '額外', money(e.amount)].filter(Boolean).join(' '))].filter(Boolean).join('\n');
     return `<td title="${esc(tip)}">${sh.quota ? money(sh.quota) : ''}${extra ? `<small>+${money(extra)}</small>` : ''}${sh.carry ? `<small>結餘 ${money(sh.carry.amount)}</small>` : ''}</td>`;
   };
+  // 支出格逐筆：土銀以外的支出，自己付的水電氣併入日常（同 fundLedger）。
+  const fundTip = (m, k) => m.source !== 'transactions' ? '' : entriesTip(monthEntries(m.month).filter((e) => e.by !== billing.UTILITY_PAYER && (k === '日常' ? ['日常', '水電氣'].includes(e.group) : e.group === k)));
+  const shareTotal = (m, i) => m.shares[i].quota + m.shares[i].extras.reduce((t, e) => t + e.amount, 0);
   return `<div class="tiles billing-tiles">${[['額度', summary.quota], ['額外', summary.extra], ['支出', summary.expense], [year === monthKey().slice(0, 4) ? '目前餘額' : '年底餘額', summary.balance]].map(([name, value]) =>
       `<div class="tile"><div class="tile-label">${name}</div><div class="tile-value">${amount(value)}</div></div>`).join('')}</div>
     ${diffs.length ? `<p class="report-notice fund-diffs" title="原表年初結餘或上月超支與前期推算的餘額不同，之後餘額以原表為準">結餘不符：${diffs.map((m) => `${m.month} ${signed(m.diff)}`).join('、')}</p>` : ''}
     ${gaps.length ? `<p class="report-notice fund-gaps" title="公赤盈＋婆赤盈應等於額度合計－月消費總額">赤盈不符：${gaps.map((m) => `${Number(m.month.slice(5))} 月 ${signed(m.settlement.gap)}`).join('、')}</p>` : ''}
     <div class="card"><h3 class="section-title">${year} 公積金帳</h3>
       <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動公積金帳"><table class="report-table fund-table"><thead><tr><th scope="col">月份</th>${billing.FUND_SHARES.map((name, i) => `<th scope="col" title="${esc(members[i] || name)}：額度，小字為額外加入或結餘">${name}</th>`).join('')}${billing.FUND_ITEMS.map((k) => `<th scope="col">${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
-        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th>${m.shares.map((sh) => shareCell(m, sh)).join('')}${billing.FUND_ITEMS.map((k) => `<td>${m.expenses ? (m.expenses[k] ? money(m.expenses[k]) : '') : '—'}</td>`).join('')}<td>${amount(m.balance)}${m.adjust ? adjustBadge(m) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.balance - m.income + m.expense)}，前期推算 ${money(m.balance - m.income + m.expense - m.diff)}">差 ${signed(m.diff)}</small>` : ''}${m.settlement?.gap ? `<small class="is-expense" title="公赤盈＋婆赤盈 ${money(m.settlement.amounts[0] + m.settlement.amounts[1])}，額度－月消費總額 ${money(m.settlement.expected)}">赤盈 ${signed(m.settlement.gap)}</small>` : ''}</td></tr>`).join('')}
-        <tr class="report-total"><th scope="row">合計</th>${billing.FUND_SHARES.map((_, i) => `<td>${money(summary.months.reduce((s, m) => s + m.shares[i].quota + m.shares[i].extras.reduce((t, e) => t + e.amount, 0), 0))}</td>`).join('')}${billing.FUND_ITEMS.map((k) => `<td>${money(summary.months.reduce((s, m) => s + (m.expenses?.[k] || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
+        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th>${m.shares.map((sh) => shareCell(m, sh)).join('')}${billing.FUND_ITEMS.map((k) => `<td${m.expenses?.[k] ? tipAttr(fundTip(m, k)) : ''}>${m.expenses ? (m.expenses[k] ? money(m.expenses[k]) : '') : '—'}</td>`).join('')}<td>${amount(m.balance)}${m.adjust ? adjustBadge(m) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.balance - m.income + m.expense)}，前期推算 ${money(m.balance - m.income + m.expense - m.diff)}">差 ${signed(m.diff)}</small>` : ''}${m.settlement?.gap ? `<small class="is-expense" title="公赤盈＋婆赤盈 ${money(m.settlement.amounts[0] + m.settlement.amounts[1])}，額度－月消費總額 ${money(m.settlement.expected)}">赤盈 ${signed(m.settlement.gap)}</small>` : ''}</td></tr>`).join('')}
+        <tr class="report-total"><th scope="row">合計</th>${billing.FUND_SHARES.map((_, i) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, shareTotal(m, i)])))}>${money(summary.months.reduce((s, m) => s + shareTotal(m, i), 0))}</td>`).join('')}${billing.FUND_ITEMS.map((k) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, m.expenses?.[k]])))}>${money(summary.months.reduce((s, m) => s + (m.expenses?.[k] || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
       </tbody></table></div></div>`;
 }
 
@@ -239,7 +276,10 @@ function bankView() {
   if (!summary.months.length) return '<div class="card"><p class="empty">這一年沒有土銀紀錄</p></div>';
   const diffs = ledger.filter((m) => m.diff);
   const items = billing.BANK_ITEMS.filter((k) => k !== '其他' || summary.months.some((m) => m.expenses.其他));
-  const incomeTip = (m) => [m.opening && `${m.opening.note} ${money(m.opening.amount)}`, ...m.incomes.map((i) => `${i.note || '入款'} ${money(i.amount)}`)].filter(Boolean).join('、');
+  const incomeTip = (m) => [m.opening && `${m.opening.note} ${money(m.opening.amount)}`, ...m.incomes.map((i) => [day(i.date), i.note || '入款', money(i.amount)].filter(Boolean).join(' '))].filter(Boolean).join('\n');
+  // 扣款格逐筆：記在土銀名下的支出，水電氣以外歸「其他」（同 bankLedger）。
+  const bankTip = (m, k) => m.source !== 'transactions' ? '' : entriesTip(monthEntries(m.month).filter((e) => e.by === billing.UTILITY_PAYER && e.amount > 0 &&
+    (e.group === '水電氣' && billing.BANK_ITEMS.includes(e.item) ? e.item : '其他') === k), false);
   const cell = (m, value) => m.source === 'missing' ? '—' : value ? money(value) : '';
   // 有年度預算時，扣款就是預算條上的已用金額，不另放一格。
   const budget = utilityBudgetView(summary);
@@ -249,8 +289,8 @@ function bankView() {
     ${diffs.length ? `<p class="report-notice bank-diffs" title="原表年初結餘與前期推算的餘額不同，之後餘額以原表為準">結餘不符：${diffs.map((m) => `${m.month} ${signed(m.diff)}`).join('、')}</p>` : ''}
     <div class="card"><h3 class="section-title">${year} 土銀帳</h3>
       <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動土銀帳"><table class="report-table bank-table"><thead><tr><th scope="col">月份</th><th scope="col" title="結餘是對帳點，不算入款">入款</th>${items.map((k) => `<th scope="col">${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
-        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th><td${incomeTip(m) ? ` title="${esc(incomeTip(m))}"` : ''}>${cell(m, m.income)}${m.opening ? `<small>結餘 ${money(m.opening.amount)}</small>` : ''}</td>${items.map((k) => `<td>${cell(m, m.expenses[k])}</td>`).join('')}<td>${amount(m.balance)}${m.adjust ? adjustBadge(m) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.opening.amount)}，前期推算 ${money(m.opening.amount - m.diff)}">差 ${signed(m.diff)}</small>` : ''}</td></tr>`).join('')}
-        <tr class="report-total"><th scope="row">合計</th><td>${money(summary.income)}</td>${items.map((k) => `<td>${money(summary.months.reduce((s, m) => s + (m.expenses[k] || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
+        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th><td${incomeTip(m) ? ` title="${esc(incomeTip(m))}"` : ''}>${cell(m, m.income)}${m.opening ? `<small>結餘 ${money(m.opening.amount)}</small>` : ''}</td>${items.map((k) => `<td${m.expenses[k] ? tipAttr(bankTip(m, k)) : ''}>${cell(m, m.expenses[k])}</td>`).join('')}<td>${amount(m.balance)}${m.adjust ? adjustBadge(m) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.opening.amount)}，前期推算 ${money(m.opening.amount - m.diff)}">差 ${signed(m.diff)}</small>` : ''}</td></tr>`).join('')}
+        <tr class="report-total"><th scope="row">合計</th><td${tipAttr(monthsTip(summary.months.map((m) => [m.month, m.income])))}>${money(summary.income)}</td>${items.map((k) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, m.expenses[k]])))}>${money(summary.months.reduce((s, m) => s + (m.expenses[k] || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
       </tbody></table></div></div>`;
 }
 
@@ -296,21 +336,28 @@ function yearTable(months, n, totals) {
   const items = billing.classificationMatrix(months);
   const counted = (i) => i < n && !['pending', 'missing'].includes(months[i].source);
   // 大項與項目的 0 留空比較好讀；總額列照常顯示。
-  const cells = (pick, blankZero = true) => months.map((m, i) => {
+  // tip(m) 回傳某月那一格的明細；即時記帳的月份才有逐筆交易。
+  const cells = (pick, blankZero = true, tip = () => '') => months.map((m, i) => {
     const v = i >= n ? '' : pick(m, i);
-    return `<td data-month="${m.month}"${i >= n ? ' class="is-future"' : ''}>${v === '' || (blankZero && v === 0) ? '' : amount(v)}</td>`;
+    const blank = v === '' || (blankZero && v === 0);
+    return `<td data-month="${m.month}"${i >= n ? ' class="is-future"' : ''}${blank || v === null ? '' : tipAttr(tip(m, i))}>${blank ? '' : amount(v)}</td>`;
   }).join('');
+  const entries = (m, keep, withItem) => m.source === 'transactions' ? entriesTip(monthEntries(m.month).filter(keep), withItem) : '';
+  const sumTip = (value) => tipAttr(monthsTip(months.map((m, i) => [m.month, counted(i) ? value(m, i) : null])));
   const group = ([name, key, tip]) => {
     const open = openGroups.has(name);
     const rows = items.filter((r) => r.group === name).sort((a, b) => itemRank(name, a.item) - itemRank(name, b.item) || a.item.localeCompare(b.item, 'zh-Hant'));
-    const head = `<tr class="group-row" data-group="${name}"><th scope="row"><button type="button" class="group-toggle" data-year-group="${name}" aria-expanded="${open}"${tip ? ` title="${tip}"` : ''}><span aria-hidden="true">${open ? '▾' : '▸'}</span>${name}</button></th>${cells((m) => m[key])}<td class="year-sum">${amount(totals[key])}</td></tr>`;
+    const head = `<tr class="group-row" data-group="${name}"><th scope="row"><button type="button" class="group-toggle" data-year-group="${name}" aria-expanded="${open}"${tip ? ` title="${tip}"` : ''}><span aria-hidden="true">${open ? '▾' : '▸'}</span>${name}</button></th>${cells((m) => m[key], true, (m) => entries(m, (e) => e.group === name))}<td class="year-sum"${sumTip((m) => m[key])}>${amount(totals[key])}</td></tr>`;
     const body = open ? rows.map((r) => {
       const known = r.months.filter((v, i) => counted(i) && v !== null);
-      return `<tr class="item-row"><th scope="row">${esc(r.item)}</th>${cells((m, i) => r.months[i])}<td class="year-sum">${known.length ? amount(known.reduce((s, v) => s + v, 0)) : '—'}</td></tr>`;
+      return `<tr class="item-row"><th scope="row">${esc(r.item)}</th>${cells((m, i) => r.months[i], true, (m) => entries(m, (e) => e.group === r.group && e.item === r.item, false))}<td class="year-sum"${sumTip((m, i) => r.months[i])}>${known.length ? amount(known.reduce((s, v) => s + v, 0)) : '—'}</td></tr>`;
     }).join('') : '';
     return `<tbody>${head}${body}</tbody>`;
   };
-  const total = (key, label, tip) => `<tbody><tr class="report-total" data-total="${key}"><th scope="row" title="${tip}">${label}</th>${cells((m) => m[key], false)}<td class="year-sum">${amount(totals[key])}</td></tr></tbody>`;
+  // 總額列的明細是組成它的大項。
+  const parts = { monthlyTotal: [['房', 'house'], ['女兒', 'daughter'], ['兒子', 'son'], ['日常', 'daily']], total: [['月消費總額', 'monthlyTotal'], ['水電氣', 'utilities']] };
+  const partsTip = (key) => (m) => parts[key].map(([name, k]) => `${name} ${amount(m[k])}`).join('\n');
+  const total = (key, label, tip) => `<tbody><tr class="report-total" data-total="${key}"><th scope="row" title="${tip}">${label}</th>${cells((m) => m[key], false, partsTip(key))}<td class="year-sum"${sumTip((m) => m[key])}>${amount(totals[key])}</td></tr></tbody>`;
   const head = months.map((m, i) => `<th scope="col"${i >= n ? ' class="is-future"' : ''} title="${i >= n ? '未到月份' : m.source === 'transactions' ? '到本月看這個月' : `${sourceLabel(m.source)}，點開看當月明細`}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1}月</button>${i < n && ['pending', 'missing'].includes(m.source) ? `<small>${sourceLabel(m.source)}</small>` : ''}</th>`).join('');
   return `<div class="card"><h3 class="section-title" title="點大項看底下的項目，點月份看那個月">年度明細</h3>
     <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動年度明細"><table class="report-table group-table year-table"><thead><tr><th scope="col">項目</th>${head}<th scope="col">合計</th></tr></thead>
@@ -350,7 +397,8 @@ function compareView() {
   };
   const cells = (key, item = '') => years.map((y) => {
     const current = sum(y, key), prev = sum(String(Number(y) - 1), key);
-    return `<td>${amount(current)}${deltaBadge(current, prev, ['收入', '餘額'].includes(item))}</td>`;
+    const tip = monthsTip(itemMonths.get(y).map(({ month, entries }) => [month.month, billing.itemValue(month, key, entries)]));
+    return `<td${current === null ? '' : tipAttr(tip)}>${amount(current)}${deltaBadge(current, prev, ['收入', '餘額'].includes(item))}</td>`;
   }).join('');
   const row = ([group, overview]) => {
     if (!group) return `<tbody><tr class="report-total">${overview === '家庭總支出' ? '<th scope="row" title="月消費總額＋水電氣">家庭總支出</th>' : '<th scope="row" title="房、女兒、兒子與日常">月消費總額<small>不含水電氣</small></th>'}${cells(billing.itemKey('總覽', overview))}</tr></tbody>`;
