@@ -243,12 +243,13 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .tile-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .tile-sub.is-up { color: var(--danger); }
 .tile-sub.is-down { color: var(--income); }
-/* 本月：支出格左邊總額、下面接收入，右邊月結減法。年度月表共用同一個支出格。 */
+/* 本月：支出格左邊總額、下面接收入，右邊月結減法。單年頁共用同一個支出格。 */
 .stats-tiles { grid-template-columns: 1fr; }
 .tile-income { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 .tile-income b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .tile-income b.is-income { color: var(--income); }
 .tile-income .tile-sub { flex-basis: 100%; margin-top: 0; }
+.billing-summary .tile-sub { white-space: pre-line; }
 .tile-ledger { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px; }
 .tile-ledger .tile-main { flex: 1 1 110px; min-width: 0; }
 .ledger { flex: 1 1 180px; max-width: 280px; font-size: 13px; color: var(--muted); }
@@ -544,15 +545,14 @@ select { padding-right: 34px; }
 .billing-layout > *, #billing-content > * { min-width: 0; }
 .report-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .report-controls .seg { grid-column: 1 / -1; margin: 0; }
-.report-controls .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.share-scope { margin: 0 0 6px; }
-.share-top { margin: 0; gap: 4px; }
+.report-controls .seg { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.share-scope, .share-top { margin: 0; gap: 4px; }
 .share-picks { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
 .share-picks .chip { font-size: 13px; min-height: 34px; padding: 4px 12px; }
 .share-picks .chip.is-on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.share-top .seg-btn { min-height: 34px; padding: 4px 12px; font-size: 13px; }
+.share-scope .seg-btn, .share-top .seg-btn { min-height: 34px; padding: 4px 12px; font-size: 13px; }
 .share-count { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
-.report-controls .seg-btn { padding: 10px 6px; font-size: 13px; white-space: nowrap; }
+.report-controls .seg-btn { padding: 10px 2px; font-size: 13px; white-space: nowrap; }
 .report-controls .field { margin: 0; }
 .year-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: center; }
 .year-nav .btn-quiet { min-width: var(--tap); padding: 4px 10px; font-size: 22px; }
@@ -579,30 +579,26 @@ ul.report-notice { padding-left: 32px; }
 .report-total > * { font-weight: 700; background: var(--accent-soft) !important; }
 .future-month td { color: var(--muted); }
 .report-table .text-button { min-height: 28px; padding: 2px 8px; }
-/* 年度明細：大項列可點開項目，項目列縮排、字小一號；合計欄與總額列加粗。 */
-.year-table .group-row > * { font-weight: 650; }
-.year-table .group-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 6px 0 0; border: 0; background: transparent; color: var(--text); font: inherit; font-weight: 650; cursor: pointer; }
-.year-table .group-toggle span { width: 12px; color: var(--muted); }
-.year-table .item-row > * { font-size: 12px; color: var(--muted); }
-.year-table .item-row > th { padding-left: 28px; font-weight: 400; }
-.year-table .item-row > td { color: var(--text); }
+/* 年度明細與跨年表：大項列可點開項目，項目列縮排、字小一號；合計欄與總額列加粗。 */
+.group-table .group-row > * { font-weight: 650; }
+.group-table .group-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 6px 0 0; border: 0; background: transparent; color: var(--text); font: inherit; font-weight: 650; cursor: pointer; }
+.group-table .group-toggle span { width: 12px; color: var(--muted); }
+.group-table .item-row > * { font-size: 12px; color: var(--muted); }
+.group-table .item-row > th { padding-left: 28px; font-weight: 400; }
+.group-table .item-row > td { color: var(--text); }
 .year-table .year-sum { font-weight: 650; border-left: 1px solid var(--line); }
 .year-table .is-future { color: var(--muted); }
-.year-table tbody + tbody > tr:first-child > * { border-top: 1px solid var(--line); }
+.group-table tbody + tbody > tr:first-child > * { border-top: 1px solid var(--line); }
 .billing-layout summary { cursor: pointer; font-weight: 600; min-height: 44px; display: list-item; padding: 8px 0; }
 @media (min-width: 760px) {
   /* 寬螢幕摘要格平均撐滿一排，土銀的三格也一樣。 */
   .billing-tiles { display: flex; flex-wrap: wrap; }
   .billing-tiles .tile { flex: 1 1 150px; }
   .report-controls { grid-template-columns: minmax(0, 1fr) 230px; }
-  .report-controls .seg { grid-column: auto; align-self: center; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .report-controls .seg { grid-column: auto; align-self: center; grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .tabs { max-width: 640px; }
 }
 
-.report-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.report-kpis .card { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; }
-.report-kpis strong { font-size: clamp(17px, 5vw, 22px); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.report-kpis .setting-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chart-card { min-width: 0; }
 .chart-card .section-head { flex-wrap: wrap; align-items: start; }
 .chart-tools { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -640,7 +636,6 @@ ul.report-notice { padding-left: 32px; }
 .report-table small.yoy-delta.is-income { color: var(--income); }
 .report-table small.yoy-delta.is-expense { color: var(--expense); }
 @media (min-width: 760px) {
-  .report-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .item-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

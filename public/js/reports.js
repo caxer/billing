@@ -5,10 +5,6 @@ import { ReportCharts } from './report-charts.js';
 import { esc } from './html.js';
 import { expenseTile } from './views.js';
 const amount = (n) => n === null || n === undefined ? '—' : money(n);
-const METRICS = [['house', '房'], ['daughter', '女兒'], ['son', '兒子'], ['daily', '扣除列項後開銷'], ['utilities', '水電氣'], ['monthlyTotal', '月消費總額（不含水電氣）'], ['total', '家庭總支出']];
-// 欄位怎麼算放在表頭提示，不佔版面。
-const METRIC_TIPS = { daily: '日常開銷', monthlyTotal: '房、女兒、兒子與日常', total: '月消費總額＋水電氣' };
-const metricHead = ([key, label]) => `<th scope="col"${METRIC_TIPS[key] ? ` title="${METRIC_TIPS[key]}"` : ''}>${label}</th>`;
 let root, context, year = monthKey().slice(0, 4), mode = 'year', detailMonth = null, shareScope = 'year', shareTop = 'amount', sharePick = '食';
 let archive = null;
 let records = {}, versions = new Map(), active = false, initialized = false, running = null, error = '', lastSync = null;
@@ -24,7 +20,7 @@ export function init(element, getters) {
   root.innerHTML = `
     <div class="stack billing-layout">
       <div class="card report-controls">
-        <div class="seg" role="group" aria-label="月結檢視"><button class="seg-btn is-on" type="button" data-report-mode="year" aria-pressed="true" title="年度月表">月表</button><button class="seg-btn" type="button" data-report-mode="compare" aria-pressed="false" title="跨年比較">跨年</button><button class="seg-btn" type="button" data-report-mode="yoy" aria-pressed="false" title="分類 YOY">YOY</button><button class="seg-btn" type="button" data-report-mode="share" aria-pressed="false" title="分類占比與日常內容排行">占比</button><button class="seg-btn" type="button" data-report-mode="bank" aria-pressed="false" title="土銀帳：水電氣">${billing.UTILITY_PAYER}</button><button class="seg-btn" type="button" data-report-mode="fund" aria-pressed="false" title="公積金帳：公婆額度與額外收入，支付房、女兒、兒子與日常">公積金</button></div>
+        <div class="seg" role="group" aria-label="月結檢視"><button class="seg-btn is-on" type="button" data-report-mode="year" aria-pressed="true" title="所選年度：逐月走勢與明細">單年</button><button class="seg-btn" type="button" data-report-mode="compare" aria-pressed="false" title="各年同期：趨勢與分類細項 YOY">跨年</button><button class="seg-btn" type="button" data-report-mode="share" aria-pressed="false" title="分類占比與日常內容排行">占比</button><button class="seg-btn" type="button" data-report-mode="bank" aria-pressed="false" title="土銀帳：水電氣">${billing.UTILITY_PAYER}</button><button class="seg-btn" type="button" data-report-mode="fund" aria-pressed="false" title="公積金帳：公婆額度與額外收入，支付房、女兒、兒子與日常">公積金</button></div>
         <div class="year-nav"><button type="button" class="btn-quiet" data-report-year="-1" aria-label="前一年">‹</button><label class="field"><select id="billing-year" aria-label="月結年度"></select></label><button type="button" class="btn-quiet" data-report-year="1" aria-label="後一年">›</button></div>
       </div>
       <p id="billing-status" class="report-status" role="status"></p>
@@ -154,7 +150,7 @@ function draw() {
   const scrollKey = (el) => el.getAttribute('aria-label') || el.className;
   const scrolls = new Map([...content.querySelectorAll(scrollSelector)].map((el) => [scrollKey(el), [el.scrollLeft, el.scrollTop]]));
   charts.beginRender();
-  content.innerHTML = mode === 'year' ? yearView() : mode === 'compare' ? compareView() : mode === 'bank' ? bankView() : mode === 'fund' ? fundView() : mode === 'share' ? shareView() : yoyView();
+  content.innerHTML = mode === 'year' ? yearView() : mode === 'compare' ? compareView() : mode === 'bank' ? bankView() : mode === 'fund' ? fundView() : shareView();
   for (const id of expanded) { const el = root.querySelector(`#${id}`); if (el) el.open = true; }
   for (const el of content.querySelectorAll(scrollSelector)) {
     const [left, top] = scrolls.get(scrollKey(el)) || [0, 0];
@@ -167,7 +163,7 @@ function draw() {
 function summaryTiles(totals, label, previous) {
   const pct = billing.percentChange(totals.total, previous?.total);
   // 和本月的支出格同一個減法，年度只是把月份加總。
-  return `<div class="tiles billing-tiles billing-summary">${expenseTile('家庭總支出', amount(totals.total), { text: `${label}${previous && pct !== null ? ` · 去年同期 ${amount(previous.total)}` : ''}` }, totals, amount)}</div>`;
+  return `<div class="tiles billing-tiles billing-summary">${expenseTile('家庭總支出', amount(totals.total), { text: `${label}${previous && pct !== null ? `\n較去年同期${pct > 0 ? '+' : ''}${pct.toFixed(1)}%` : ''}` }, totals, amount)}</div>`;
 }
 
 const signed = (n) => `${n > 0 ? '+' : '−'}${money(Math.abs(n))}`;
@@ -179,7 +175,7 @@ function utilityBudgetView({ expense: spent, missing }) {
   if (!limit) return '';
   const left = limit - spent, used = Math.round((spent / limit) * 100), over = left < 0;
   return `<div class="card utility-budget" title="在設定頁調整">
-    <div class="budget-head"><span class="budget-title">年度預算</span><span class="budget-num">${money(spent)} / ${money(limit)}</span></div>
+    <div class="budget-head"><span class="budget-title">扣款／年度預算</span><span class="budget-num">${money(spent)} / ${money(limit)}</span></div>
     <div class="bar" role="progressbar" aria-label="${billing.UTILITY_PAYER}年度預算使用進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, used)}" aria-valuetext="已用 ${used}%"><div class="bar-fill ${over ? 'is-over' : used >= 80 ? 'is-warn' : ''}" style="width:${Math.min(100, used)}%"></div></div>
     <p class="budget-note ${over ? 'is-over' : ''}">${over ? `已超出 ${money(-left)} 元` : `還可用 ${money(left)} 元`} · 已用 ${used}%${missing ? ` · 缺 ${missing} 個月` : ''}</p>
   </div>`;
@@ -197,15 +193,14 @@ function shareView() {
   let s = billing.shareSummary(items, context.settings()?.billingGroups, 10, shareTop, sharePick);
   // 切到沒有支出的期間時回到日常。
   if (!s.picks.includes(sharePick) && s.picks.length) { sharePick = s.picks[0]; s = billing.shareSummary(items, context.settings()?.billingGroups, 10, shareTop, sharePick); }
-  const scopeButtons = [['year', `${year} 年`], ['all', '全部年度']].map(([key, label]) =>
+  const scopeButtons = [['year', year], ['all', '全部']].map(([key, label]) =>
     `<button type="button" class="seg-btn ${shareScope === key ? 'is-on' : ''}" data-share-scope="${key}" aria-pressed="${shareScope === key}">${label}</button>`).join('');
   const range = months.length ? `${months[0]}～${months.at(-1)} · ${months.length} 個月` : '沒有資料';
   const bar = (name, value, total, extra = '', color = '', scale = total, search = null) => `<div class="cat${search ? ' cat-link' : ''}"${search ? ` data-search="${esc(search[0])}" data-search-cat="${esc(search[1] || '')}" role="button" tabindex="0" title="到明細看全部紀錄"` : ''}><span class="cat-name">${esc(name)}${extra}</span><span class="cat-pct">${total ? (value / total * 100).toFixed(1) : 0}%</span><span class="cat-amount">${money(value)}</span><span class="cat-bar"><span style="width:${scale ? Math.max(0, value / scale * 100) : 0}%${color ? `;background:${color}` : ''}"></span></span></div>`;
   const catTotal = s.categories.reduce((sum, c) => sum + c.amount, 0);
   const topTotal = s.topTotal;
   const top = s.top.map((t, i) => bar(`${i + 1}. ${t.name}`, t.amount, topTotal, `<small class="share-count">${t.count} 筆 · 平均 ${money(Math.round(t.amount / t.count))}${t.parts.length > 1 ? ` · ${t.parts.slice(0, 3).map((p) => `${esc(p.name || '未寫品項')} ${p.count}`).join('、')}` : ''}</small>`, '', s.top[0].amount, [t.name, billing.GROUPS.includes(sharePick) ? '' : sharePick])).join('');
-  return `<div class="card"><div class="seg share-scope" role="group" aria-label="占比範圍">${scopeButtons}</div><p class="setting-hint">${range} · 家庭總支出 ${amount(s.total)}</p></div>
-    <div class="card"><h3 class="section-title">大項占比</h3>${s.groups.length ? s.groups.map((g) => bar(g.name, g.amount, s.total, '', g.color)).join('') : '<p class="empty">沒有支出</p>'}</div>
+  return `<div class="card"><div class="section-head"><h3 class="section-title">大項占比</h3><span class="seg share-scope" role="group" aria-label="占比範圍">${scopeButtons}</span></div><p class="setting-hint">${range} · 家庭總支出 ${amount(s.total)}</p>${s.groups.length ? s.groups.map((g) => bar(g.name, g.amount, s.total, '', g.color)).join('') : '<p class="empty">沒有支出</p>'}</div>
     <div class="card"><div class="section-head"><h3 class="section-title" title="占所選類別支出的比例；依備註空格前的店名合計，例如 7-11、7-11 早餐都算 7-11">${esc(sharePick)} Top 10</h3><span class="seg share-top" role="group" aria-label="排行依據">${[['amount', '金額'], ['count', '次數']].map(([key, label]) => `<button type="button" class="seg-btn ${shareTop === key ? 'is-on' : ''}" data-share-top="${key}" aria-pressed="${shareTop === key}">${label}</button>`).join('')}</span></div><div class="share-picks" role="group" aria-label="排行的類別">${s.picks.map((p) => `<button type="button" class="chip${p === sharePick ? ' is-on' : ''}" data-share-pick="${esc(p)}" aria-pressed="${p === sharePick}">${esc(p)}</button>`).join('')}</div>${top || `<p class="empty">${esc(sharePick)}沒有寫內容的紀錄</p>`}</div>
     <div class="card"><h3 class="section-title">分類占比</h3>${s.categories.map((c) => bar(c.name, c.amount, catTotal, '', '', catTotal, ['', c.name])).join('') || '<p class="empty">沒有支出</p>'}</div>`;
 }
@@ -246,9 +241,11 @@ function bankView() {
   const items = billing.BANK_ITEMS.filter((k) => k !== '其他' || summary.months.some((m) => m.expenses.其他));
   const incomeTip = (m) => [m.opening && `${m.opening.note} ${money(m.opening.amount)}`, ...m.incomes.map((i) => `${i.note || '入款'} ${money(i.amount)}`)].filter(Boolean).join('、');
   const cell = (m, value) => m.source === 'missing' ? '—' : value ? money(value) : '';
-  return `<div class="tiles billing-tiles">${[['入款', summary.income], ['扣款', summary.expense], [year === monthKey().slice(0, 4) ? '目前餘額' : '年底餘額', summary.balance]].map(([name, value]) =>
+  // 有年度預算時，扣款就是預算條上的已用金額，不另放一格。
+  const budget = utilityBudgetView(summary);
+  return `<div class="tiles billing-tiles">${[['入款', summary.income], !budget && ['扣款', summary.expense], [year === monthKey().slice(0, 4) ? '目前餘額' : '年底餘額', summary.balance]].filter(Boolean).map(([name, value]) =>
       `<div class="tile"><div class="tile-label">${name}</div><div class="tile-value">${amount(value)}</div></div>`).join('')}</div>
-    ${utilityBudgetView(summary)}
+    ${budget}
     ${diffs.length ? `<p class="report-notice bank-diffs" title="原表年初結餘與前期推算的餘額不同，之後餘額以原表為準">結餘不符：${diffs.map((m) => `${m.month} ${signed(m.diff)}`).join('、')}</p>` : ''}
     <div class="card"><h3 class="section-title">${year} 土銀帳</h3>
       <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動土銀帳"><table class="report-table bank-table"><thead><tr><th scope="col">月份</th><th scope="col" title="結餘是對帳點，不算入款">入款</th>${items.map((k) => `<th scope="col">${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
@@ -265,28 +262,13 @@ function yearView() {
   const label = n === 0 ? '未到年度' : `${periodLabel(months, n)}${year === monthKey().slice(0, 4) && months[n - 1]?.source === 'transactions' ? '（含本月）' : ''}`;
   const conflicts = current.filter((m) => m.conflict);
   const missing = current.some((m) => m.source === 'missing');
-  const stats = billing.reportStats(current);
   return `${summaryTiles(totals, label, n ? previous : null)}
     ${missing ? '<p class="report-notice">部分月份缺資料，合計顯示「—」</p>' : ''}
     ${hasPending ? '<p class="report-notice">待補月結月份不計入合計</p>' : ''}
     ${conflicts.length ? `<p class="report-notice">${conflicts.map((m) => m.month).join('、')} 只採歷史月結</p>` : ''}
     ${current.some((m) => m.daily < 0) ? '<p class="report-notice">歷史扣除列項後開銷有負值，請核對</p>' : ''}
-    ${kpiView(stats, previous)}${charts.monthly(year)}
+    ${charts.monthly(year)}
     ${yearTable(months, n, totals)}${detailMonth ? detailView(months.find((m) => m.month === detailMonth)) : ''}`;
-}
-
-function kpiView(stats, previous) {
-  const top = stats.largest, percentage = billing.percentChange(stats.totals.total, previous.total);
-  const pctText = percentage === null ? '—' : `${percentage > 0 ? '+' : ''}${percentage.toFixed(1)}%`;
-  const peak = stats.highest, low = stats.lowest;
-  const values = [
-    ['月平均', amount(stats.average), '', `${stats.averageCount} 個有支出月份`],
-    ['較去年同期', pctText, stats.totals.total === null || previous.total === null ? '缺少可比資料' : `${stats.totals.total >= previous.total ? '多花' : '少花'} ${amount(Math.abs(stats.totals.total - previous.total))}`],
-    ['最大支出類別', top ? `${top.name} ${stats.totals.total ? (top.amount / stats.totals.total * 100).toFixed(0) : 0}%` : '—', top ? amount(top.amount) : '—'],
-    // 最高與最低放同一格，手機上四格剛好兩排。
-    ['最高／最低月份', peak && low ? `${Number(peak.month.slice(-2))}月／${Number(low.month.slice(-2))}月` : '—', peak && low ? `${amount(peak.total)}／${amount(low.total)}` : '—'],
-  ];
-  return `<div class="report-kpis" aria-label="期間重點指標">${values.map(([name, value, sub, tip = '']) => `<div class="card"${tip ? ` title="${esc(tip)}"` : ''}><span class="setting-hint">${name}</span><strong>${esc(value)}</strong>${sub ? `<span class="setting-hint">${esc(sub)}</span>` : ''}</div>`).join('')}</div>`;
 }
 
 const sourceLabel = (source) => ({ history: '歷史月結', transactions: '即時記帳', pending: '待補月結', missing: '缺少歷史' }[source] || '—');
@@ -331,7 +313,7 @@ function yearTable(months, n, totals) {
   const total = (key, label, tip) => `<tbody><tr class="report-total" data-total="${key}"><th scope="row" title="${tip}">${label}</th>${cells((m) => m[key], false)}<td class="year-sum">${amount(totals[key])}</td></tr></tbody>`;
   const head = months.map((m, i) => `<th scope="col"${i >= n ? ' class="is-future"' : ''} title="${i >= n ? '未到月份' : m.source === 'transactions' ? '到本月看這個月' : `${sourceLabel(m.source)}，點開看當月明細`}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1}月</button>${i < n && ['pending', 'missing'].includes(m.source) ? `<small>${sourceLabel(m.source)}</small>` : ''}</th>`).join('');
   return `<div class="card"><h3 class="section-title" title="點大項看底下的項目，點月份看那個月">年度明細</h3>
-    <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動年度明細"><table class="report-table year-table"><thead><tr><th scope="col">項目</th>${head}<th scope="col">合計</th></tr></thead>
+    <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動年度明細"><table class="report-table group-table year-table"><thead><tr><th scope="col">項目</th>${head}<th scope="col">合計</th></tr></thead>
       ${YEAR_GROUPS.map(group).join('')}
       ${total('monthlyTotal', '月消費總額<small>不含水電氣</small>', '房、女兒、兒子與日常')}
       ${group(['水電氣', 'utilities'])}
@@ -350,28 +332,10 @@ function detailView(m) {
   </div>`;
 }
 
+/** 跨年：費用趨勢圖，加上各年同期的分類細項 YOY。列照年度明細排：總覽列點開看底下的項目，月消費總額與家庭總支出接在算進它們的大項後面。 */
+const COMPARE_ROWS = [['房', '房'], ['女兒', '女兒'], ['兒子', '兒子'], ['日常', '扣除列項後開銷'], ['', '月消費總額（不含水電氣）'], ['水電氣', '水電氣'], ['', '家庭總支出'], ['家用'], ['Shareroo'], ['收入']];
+
 function compareView() {
-  const years = allYears().filter((y) => y <= monthKey().slice(0, 4)).sort();
-  const n = elapsed(year);
-  const reference = monthsFor(year);
-  const selectMonths = (target) => monthsFor(target).filter((m, i) => i < n && reference[i].source !== 'pending');
-  return `${charts.growth()}<div class="card"><h3 class="section-title">各年度同期間比較</h3><p class="setting-hint" title="待補月份不加入比較；缺少的歷史顯示「—」">${n ? `各年 ${periodLabel(reference, n)}` : '請選已開始的年度'}</p>
-    <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動跨年比較"><table class="report-table"><thead><tr><th scope="col">年度</th>${METRICS.map(metricHead).join('')}<th scope="col">較去年同期</th></tr></thead><tbody>
-    ${years.map((y) => {
-      const totals = billing.reportTotals(selectMonths(y));
-      const prev = billing.reportTotals(selectMonths(String(Number(y) - 1)));
-      return `<tr><th scope="row">${y}</th>${METRICS.map(([key]) => `<td>${n ? amount(totals[key]) : '—'}${n ? deltaBadge(totals[key], prev[key]) : ''}</td>`).join('')}<td>${n ? deltaBadge(totals.total, prev.total, false, true) : '—'}</td></tr>`;
-    }).join('')}</tbody></table></div></div>`;
-}
-
-function deltaBadge(current, previous, goodWhenUp = false, showMissing = false) {
-  const pct = billing.percentChange(current, previous);
-  if (pct === null) return showMissing ? '—' : '';
-  const cls = Math.abs(pct) < .05 ? '' : (pct > 0) === goodWhenUp ? 'is-income' : 'is-expense';
-  return `<small class="yoy-delta ${cls}">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</small>`;
-}
-
-function yoyView() {
   const years = charts.years().sort((a, b) => b - a), n = elapsed(year), reference = monthsFor(year);
   const selected = (y) => monthsFor(y).filter((m, i) => i < n && reference[i].source !== 'pending');
   const options = charts.itemOptions();
@@ -384,11 +348,31 @@ function yoyView() {
     if (JSON.parse(key)[1] === '餘額') return values.at(-1) ?? null;
     return !values.length || values.some((v) => v === null) ? null : values.reduce((s, v) => s + v, 0);
   };
-  return `<div class="card"><h3 class="section-title">分類與細項 YOY</h3><p class="setting-hint" title="增減以去年同期為基準；去年為零或資料不足不計百分比">各年 ${periodLabel(reference, n)}</p>
-    <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動分類細項 YOY"><table class="report-table"><thead><tr><th scope="col">分類／項目</th>${years.map((y) => `<th scope="col">${y}</th>`).join('')}</tr></thead><tbody>${options.map((o) => `<tr><th scope="row">${esc(o.item)}<small>${esc(o.group)}</small></th>${years.map((y) => {
-      const current = sum(y, o.key), prev = sum(String(Number(y) - 1), o.key);
-      return `<td>${amount(current)}${deltaBadge(current, prev, ['收入', '餘額'].includes(o.item))}</td>`;
-    }).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  const cells = (key, item = '') => years.map((y) => {
+    const current = sum(y, key), prev = sum(String(Number(y) - 1), key);
+    return `<td>${amount(current)}${deltaBadge(current, prev, ['收入', '餘額'].includes(item))}</td>`;
+  }).join('');
+  const row = ([group, overview]) => {
+    if (!group) return `<tbody><tr class="report-total">${overview === '家庭總支出' ? '<th scope="row" title="月消費總額＋水電氣">家庭總支出</th>' : '<th scope="row" title="房、女兒、兒子與日常">月消費總額<small>不含水電氣</small></th>'}${cells(billing.itemKey('總覽', overview))}</tr></tbody>`;
+    const items = options.filter((o) => o.group === group);
+    if (!items.length) return '';
+    // 和年度明細的展開狀態分開記。
+    const id = `跨年／${group}`, open = openGroups.has(id);
+    const head = `<tr class="group-row"><th scope="row"><button type="button" class="group-toggle" data-year-group="${id}" aria-expanded="${open}"${overview && overview !== group ? ` title="${overview}"` : ''}><span aria-hidden="true">${open ? '▾' : '▸'}</span>${group}</button></th>${overview ? cells(billing.itemKey('總覽', overview)) : years.map(() => '<td></td>').join('')}</tr>`;
+    const body = open ? items.map((o) => `<tr class="item-row"><th scope="row">${esc(o.item)}</th>${cells(o.key, o.item)}</tr>`).join('') : '';
+    return `<tbody>${head}${body}</tbody>`;
+  };
+  return `${charts.growth()}<div class="card"><h3 class="section-title" title="增減以去年同期為基準；待補月份不加入比較，去年為零或資料不足不計百分比">各年 ${n ? periodLabel(reference, n) : '同期'}</h3>
+    <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動跨年比較"><table class="report-table group-table"><thead><tr><th scope="col">項目</th>${years.map((y) => `<th scope="col">${y}</th>`).join('')}</tr></thead>
+      ${COMPARE_ROWS.map(row).join('')}
+    </table></div></div>`;
+}
+
+function deltaBadge(current, previous, goodWhenUp = false) {
+  const pct = billing.percentChange(current, previous);
+  if (pct === null) return '';
+  const cls = Math.abs(pct) < .05 ? '' : (pct > 0) === goodWhenUp ? 'is-income' : 'is-expense';
+  return `<small class="yoy-delta ${cls}">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</small>`;
 }
 
 export const selectedDetailMonth = () => detailMonth;

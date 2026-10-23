@@ -1,5 +1,5 @@
 // 月結的純計算與分類對應；歷史合計與新交易永遠擇一使用。
-import { shiftMonth, seriesStats, isAdjustment } from './calc.js';
+import { shiftMonth, isAdjustment } from './calc.js';
 import { ruleCategory } from './rules.js';
 export const GROUPS = ['日常', '房', '女兒', '兒子', '水電氣'];
 /** 日常的分類（食衣住行育樂），固定順序。 */
@@ -180,15 +180,6 @@ export function historySummary(rows, index) {
     { id: 'derived-balance', group: '水電氣', item: '餘額', amount: utilityBalance, note: '計算：收入 − 電費 − 水費 − 燃氣 + 上月餘額（沿用原表每年從零開始）' },
     { id: 'derived-daily', group: 'Shareroo', item: '扣除(列項)後的開銷', amount: daily, note: '計算：月消費總額 − 房 − 女兒 − 兒子' }],
   };
-}
-
-export function reportStats(months) {
-  const totals = reportTotals(months);
-  const stats = seriesStats(months.map((m) => m.total));
-  const categories = STACK_GROUPS.map((g) => ({ ...g, amount: totals[g.key] })).filter((g) => Number.isFinite(g.amount)).sort((a, b) => b.amount - a.amount);
-  return { totals, count: stats.count, averageCount: stats.averageCount, average: totals.total === null ? null : stats.average,
-    highest: months[stats.highest[0]?.index] || null, lowest: months[stats.lowest[0]?.index] || null,
-    largest: totals.total === null ? null : categories[0] || null };
 }
 
 export const itemKey = (group, item) => JSON.stringify([group, item]);
