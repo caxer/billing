@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="color-scheme" content="light dark"/>
+<meta name="robots" content="noindex"/>
+<title>帳本紀錄</title>
+<link rel="manifest" href="app.webmanifest"/>
+<link rel="icon" href="icon.svg" type="image/svg+xml"/>
+<link rel="apple-touch-icon" href="icon.svg"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="帳本紀錄"/>
+<meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)"/>
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)"/>
+<link rel="stylesheet" href="style.css"/>
+<link rel="stylesheet" href="login-screen.css">
+</head>
+<body>
+
+<div id="lock" class="auth-screen">
+  <div class="login-page">
+    <div class="login-brand"><span class="brand-mark"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z M4 9h16 M8 13h3 M8 16h7"/></svg></span>帳本紀錄</div>
+    <div class="login-intro"><h1>每一筆收支，<br>清楚記錄。</h1></div>
+    <section class="login-card" aria-label="開啟帳本紀錄">
+      <span class="login-lock"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+      <h2 id="lock-title">用專屬連結開啟</h2>
+      <button type="button" class="login-primary" data-login-paste title="點過一次專屬連結，這台裝置就會記住。主畫面 App 第一次請先複製連結再按這裡。連結就是鑰匙，請勿轉傳。"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span data-login-paste-label>貼上專屬連結</span></button>
+      <p id="lock-error" class="login-error" role="alert" data-login-error hidden></p>
+    </section>
+  </div>
+</div>
+
+<div id="who" class="lock" hidden>
+  <div class="lock-card">
+    <h1>這支手機是</h1>
+    <p class="lock-hint">之後可在設定改</p>
+    <div id="who-choices" class="who-choices"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-row">
+      <h1 id="view-title">看板</h1>
+      <button id="sync-state" class="sync" type="button" aria-label="重新同步帳本" title="重新同步帳本" aria-live="polite">載入中</button>
+    </div>
+    <div id="month-nav" class="month-nav" hidden>
+      <button id="month-prev" type="button" aria-label="上個月">‹</button>
+      <button id="month-label" type="button" aria-label="選擇年月" aria-haspopup="dialog" aria-expanded="false" aria-controls="month-picker">—</button>
+      <button id="month-next" type="button" aria-label="下個月">›</button>
+    </div>
+    <div id="month-picker" class="month-picker" role="dialog" aria-label="選擇年月" hidden>
+      <div class="picker-year">
+        <button type="button" class="btn-quiet" data-year-step="-1" aria-label="上一年">‹</button>
+        <strong id="picker-year" aria-live="polite"></strong>
+        <button type="button" class="btn-quiet" data-year-step="1" aria-label="下一年">›</button>
+      </div>
+      <div id="picker-months" class="picker-months"></div>
+      <button type="button" class="btn-quiet" id="picker-today">本月</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-add" class="view">
+      <div class="seg add-types" role="group" aria-label="記帳類型">
+        <button type="button" class="seg-btn is-on" data-type="expense" aria-pressed="true">支出</button>
+        <button type="button" class="seg-btn" data-type="income" aria-pressed="false">收入</button>
+        <button type="button" class="seg-btn" data-type="note" aria-pressed="false" title="例如換濾心：不記金額與分類，在行事曆看距今或還剩幾天">記事</button>
+      </div>
+
+      <form id="add-form" class="card add-form">
+        <div id="ai-tools" class="ai-tools" hidden>
+          <button type="button" class="btn-quiet" id="ai-voice" aria-pressed="false" title="說出一筆帳，例如「昨天全聯三百五」，AI 幫你填好"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>說一筆</span></button>
+          <button type="button" class="btn-quiet" id="ai-photo" title="拍收據或發票，AI 填好金額、日期與內容"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>拍收據</span></button>
+          <input type="file" id="ai-photo-file" accept="image/*" capture="environment" hidden/>
+        </div>
+        <p id="ai-status" class="ai-status" role="status" hidden></p>
+        <label class="amount-row">
+          <span id="amount-sign" class="amount-sign">−</span>
+          <input id="add-amount" type="text" inputmode="numeric" placeholder="0"
+                 autocomplete="off" aria-label="金額（元）" aria-describedby="add-error" enterkeyhint="done" required/>
+          <span class="amount-unit">元</span>
+        </label>
+
+        <div class="field">
+          <label class="field-label" for="add-note">內容</label>
+          <input id="add-note" type="text" placeholder="全聯、麥當勞、電費" enterkeyhint="done" autocomplete="off"/>
+          <div id="note-suggest" class="note-suggest" role="group" aria-label="以前用過的名稱" title="以前用過的名稱，點一下帶入，寫法一致" hidden></div>
+        </div>
+
+        <label class="field" id="add-category-field">
+          <span class="field-label">分類 <small id="add-category-auto" class="auto-badge" title="依內容自動判斷，可以手動改" hidden>自動</small></span>
+          <select id="add-category" required></select>
+        </label>
+
+        <div class="field">
+          <label class="field-label" for="add-date">日期</label>
+          <div class="date-controls">
+            <div class="date-button">
+              <span class="date-pick" id="add-date-text" aria-hidden="true">選擇日期</span>
+              <input id="add-date" type="date"/>
+            </div>
+            <div class="date-shortcuts" role="group" aria-label="快速選擇日期">
+              <button type="button" class="chip" data-day="today">今天</button>
+              <button type="button" class="chip" data-day="yesterday">昨天</button>
+            </div>
+          </div>
+        </div>
+
+        <label class="field" id="add-repeat-field">
+          <span class="field-label">重複</span>
+          <select id="add-repeat" aria-label="重複"><option value="">不重複</option><option value="week">每週</option><option value="month">每月</option></select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">誰記的</span>
+          <select id="add-by" required></select>
+        </label>
+
+        <p id="add-error" class="form-error" role="alert" hidden></p>
+        <label class="same-name" id="add-same" hidden><input type="checkbox" id="add-same-all"><span id="add-same-text"></span></label>
+        <button type="submit" class="btn-primary btn-block" id="add-submit">記下來</button>
+        <div class="date-row" id="add-cancel-row">
+          <button type="button" class="btn-quiet" id="add-cancel" hidden>取消編輯</button>
+          <button type="button" class="btn-quiet danger-button" id="add-delete" hidden>刪除這筆</button>
+        </div>
+      </form>
+      <div id="add-recent" class="add-recent"></div>
+    </section>
+
+    <section id="view-calendar" class="view" hidden></section>
+
+    <section id="view-stats" class="view" hidden></section>
+    <section id="view-records" class="view" hidden></section>
+
+    <section id="view-billing" class="view" hidden></section>
+
+    <section id="view-settings" class="view" hidden></section>
+  </main>
+
+  <nav class="tabs" aria-label="主要分頁">
+    <button type="button" class="tab is-on" data-view="add"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8M8 12h8"/></svg><span>記帳</span></button>
+    <button type="button" class="tab" data-view="records"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>明細</span></button>
+    <button type="button" class="tab" data-view="calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m9 15.5 2 2 4-4"/></svg><span>行事曆</span></button>
+    <button type="button" class="tab" data-view="stats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7"/></svg><span>本月</span></button>
+    <button type="button" class="tab" data-view="billing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7 2v4m10-4v4M3 9h18M7 13h3m4 0h3M7 17h3m4 0h3"/></svg><span>年度</span></button>
+    <button type="button" class="tab" data-view="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span>設定</span></button>
+  </nav>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

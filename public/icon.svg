@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="帳本紀錄">
+  <rect width="192" height="192" rx="42" fill="#0f766e"/>
+  <rect x="40" y="32" width="112" height="128" rx="12" fill="#f4f5f7"/>
+  <rect x="58" y="52" width="76" height="12" rx="6" fill="#0f766e"/>
+  <rect x="58" y="80" width="76" height="12" rx="6" fill="#94a3b8"/>
+  <rect x="58" y="108" width="52" height="12" rx="6" fill="#94a3b8"/>
+  <circle cx="132" cy="132" r="26" fill="#f97316"/>
+  <path d="M121 132h22M132 121v22" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+</svg>
