@@ -2,6 +2,8 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"/>
+<!-- 就算哪天出現 XSS，也只能連 GitHub／Claude API，不能把解開的 token 送去別處 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://api.anthropic.com; object-src 'none'; base-uri 'none'; form-action 'none'"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="color-scheme" content="light dark"/>
 <meta name="robots" content="noindex"/>
