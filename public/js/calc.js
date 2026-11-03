@@ -50,9 +50,8 @@ export function filterItems(items, { query = '', type = '', by = '', category = 
   });
 }
 
-/** 歷史轉入的帳戶結餘調整：讓土銀與公積金餘額對上原表，不算收支。 */
-export const ADJUSTMENT = '結餘調整';
-export const isAdjustment = (it) => it.category === ADJUSTMENT;
+/** 帳戶的結餘調整（kind: adjustment，例如土銀期初）：只動餘額，不算收支。 */
+export const isAdjustment = (it) => it.kind === 'adjustment';
 
 const ofType = (items, type) => items.filter((it) => it.type === type && !isAdjustment(it));
 

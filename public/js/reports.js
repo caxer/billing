@@ -5,8 +5,8 @@ import { ReportCharts } from './report-charts.js';
 import { esc } from './html.js';
 import { expenseTile, offsetCat } from './views.js';
 const amount = (n) => n === null || n === undefined ? '—' : money(n);
-let root, context, year = monthKey().slice(0, 4), mode = 'year', detailMonth = null, shareScope = 'year', shareTop = 'amount', sharePick = '食';
-let archive = null, archiveSha = null, changedData = false, shownError = '';
+let root, context, year = monthKey().slice(0, 4), mode = 'year', shareScope = 'year', shareTop = 'amount', sharePick = '食';
+let changedData = false, shownError = '';
 /** 房貸是已結清的歷史紀錄，載入一次；undefined 表示還沒讀。 */
 let loan;
 let records = {}, versions = new Map(), active = false, initialized = false, running = null, error = '', lastSync = null;
@@ -32,16 +32,16 @@ export function init(element, getters) {
       <div id="billing-content" class="stack"></div>
     </div>`;
 
-  root.querySelector('#billing-year').addEventListener('change', (e) => { year = e.target.value; detailMonth = null; draw(); });
+  root.querySelector('#billing-year').addEventListener('change', (e) => { year = e.target.value; draw(); });
   charts = new ReportCharts(root, { year: () => year, years: allYears, months: monthsFor, draw });
   root.addEventListener('click', (e) => {
     const button = e.target.closest('[data-report-mode]');
-    if (button) { mode = button.dataset.reportMode; detailMonth = null; draw(); }
+    if (button) { mode = button.dataset.reportMode; draw(); }
     const step = e.target.closest('[data-report-year]');
     if (step) {
       // 年度選單由新到舊排列：前一年是下一個選項。
       const years = allYears(), i = years.indexOf(year) - Number(step.dataset.reportYear);
-      if (years[i]) { year = years[i]; detailMonth = null; draw(); }
+      if (years[i]) { year = years[i]; draw(); }
       return;
     }
     const scope = e.target.closest('[data-share-scope]');
@@ -57,13 +57,11 @@ export function init(element, getters) {
     const toggle = e.target.closest('[data-year-group]');
     if (toggle) { const name = toggle.dataset.yearGroup; if (!openGroups.delete(name)) openGroups.add(name); draw(); return; }
     const monthButton = e.target.closest('[data-billing-month]');
-    // 即時記帳的月份到本月分頁看，和那裡的分類佔比、明細同一份；歷史與待補月份才在這裡列。
-    const opened = monthButton && monthsFor(year).find((m) => m.month === monthButton.dataset.billingMonth);
-    if (opened?.source === 'transactions' && opened.month <= monthKey()) { context.openMonth?.(opened.month); return; }
-    if (monthButton) { detailMonth = monthButton.dataset.billingMonth; draw(); root.querySelector('#billing-detail')?.scrollIntoView({ block: 'nearest' }); }
+    // 到本月分頁看那個月，和那裡的分類佔比、明細同一份；未到的月份沒有東西看。
+    if (monthButton && monthButton.dataset.billingMonth <= monthKey()) context.openMonth?.(monthButton.dataset.billingMonth);
   });
   root.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-search]')) { e.preventDefault(); e.target.click(); } });
-  // 年度頁可見時追蹤整個月份目錄，支援他人修改其他月份與歷史檔。
+  // 年度頁可見時追蹤整個月份目錄，支援他人修改其他月份。
   setInterval(() => { if (active && document.visibilityState !== 'hidden') refresh(); }, 10000);
   document.addEventListener('visibilitychange', () => { if (active && document.visibilityState === 'visible') refresh(); });
 }
@@ -88,14 +86,12 @@ export async function refresh() {
   running = (async () => {
     try {
       const readingRevision = revision;
-      const [files, found, loaded] = await Promise.all([store.listMonths(), store.loadHistory(), loan === undefined ? store.loadLoan() : loan]);
+      const [files, loaded] = await Promise.all([store.listMonths(), loan === undefined ? store.loadLoan() : loan]);
       if (revision !== readingRevision) throw new Error('同步期間有新變更，請稍後重試');
       loan = loaded;
       const present = new Set(files.map((f) => f.month));
-      // 月檔、歷史月結或月份目錄都沒變，就不用重畫（重畫會收起展開的明細）。
-      if (!initialized || found.sha !== archiveSha || files.length !== versions.size) changedData = true;
-      archiveSha = found.sha;
-      archive = found.archive;
+      // 月檔與月份目錄都沒變，就不用重畫（重畫會收起展開的明細）。
+      if (!initialized || files.length !== versions.size) changedData = true;
       for (const key of Object.keys(records)) if (!present.has(key)) delete records[key];
       for (const key of versions.keys()) if (!present.has(key)) versions.delete(key);
       const queue = files.filter((f) => versions.get(f.month) !== f.sha);
@@ -137,12 +133,11 @@ function ready() {
 
 function allYears() {
   const today = Number(monthKey().slice(0, 4));
-  return [...new Set([String(today), String(today - 1), String(today + 1), year, ...(archive?.years || []), ...Object.keys(records).map((m) => m.slice(0, 4)), ...[...missing].map((m) => m.slice(0, 4))])].sort((a, b) => Number(b) - Number(a));
+  return [...new Set([String(today), String(today - 1), String(today + 1), year, ...Object.keys(records).map((m) => m.slice(0, 4)), ...[...missing].map((m) => m.slice(0, 4))])].sort((a, b) => Number(b) - Number(a));
 }
 
 function monthsFor(target) {
-  if (!monthCache.has(target)) monthCache.set(target,
-    billing.annualReport(target, records, archive?.data, billing.reportCutoff(archive), context.settings()?.billingGroups, billing.historyEnd(archive)));
+  if (!monthCache.has(target)) monthCache.set(target, billing.annualReport(target, records, context.settings()?.billingGroups));
   return monthCache.get(target);
 }
 
@@ -151,10 +146,9 @@ function elapsed(target) {
   return target < now.slice(0, 4) ? 12 : target > now.slice(0, 4) ? 0 : Number(now.slice(-2));
 }
 
-/** 年度選單的提示：最後同步時間與歷史月結範圍；同步沒有新資料時只更新這裡。 */
+/** 年度選單的提示：最後同步時間；同步沒有新資料時只更新這裡。 */
 function syncTitle() {
-  root.querySelector('#billing-year').title = [lastSync && `同步於 ${lastSync.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`,
-    archive && (archive.migratedThrough ? `歷史月結已轉入記帳（${archive.years[0]}-01～${archive.migratedThrough}）` : `歷史月結至 ${billing.historyEnd(archive)} · 正式記帳 ${archive.cutoverMonth} 起`)].filter(Boolean).join(' · ');
+  root.querySelector('#billing-year').title = lastSync ? `同步於 ${lastSync.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}` : '';
 }
 
 function draw() {
@@ -211,22 +205,24 @@ function summaryTiles(totals, label, previous) {
 }
 
 const signed = (n) => `${n > 0 ? '+' : '−'}${money(Math.abs(n))}`;
-/** 轉入記帳後的結餘調整：第一個月是期初結餘，之後是原表結餘與推算的差。 */
+/** 結餘調整：第一個月是期初結餘，之後是調整的金額。 */
 const adjustBadge = (m) => m.adjust ? `<small${m.diff ? ' class="is-expense"' : ''} title="${esc(m.adjust.note || '結餘調整')}">${m.diff ? '差' : '期初'} ${signed(m.adjust.amount)}</small>` : '';
 
-function utilityBudgetView({ expense: spent, missing }) {
+function utilityBudgetView({ expense: spent }) {
   const limit = billing.utilityBudget(context.settings(), year);
   if (!limit) return '';
   const left = limit - spent, used = Math.round((spent / limit) * 100), over = left < 0;
   return `<div class="card utility-budget" title="在設定頁調整">
     <div class="budget-head"><span class="budget-title">扣款／年度預算</span><span class="budget-num">${money(spent)} / ${money(limit)}</span></div>
     <div class="bar" role="progressbar" aria-label="${billing.UTILITY_PAYER}年度預算使用進度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, used)}" aria-valuetext="已用 ${used}%"><div class="bar-fill ${over ? 'is-over' : used >= 80 ? 'is-warn' : ''}" style="width:${Math.min(100, used)}%"></div></div>
-    <p class="budget-note ${over ? 'is-over' : ''}">${over ? `已超出 ${money(-left)} 元` : `還可用 ${money(left)} 元`} · 已用 ${used}%${missing ? ` · 缺 ${missing} 個月` : ''}</p>
+    <p class="budget-note ${over ? 'is-over' : ''}">${over ? `已超出 ${money(-left)} 元` : `還可用 ${money(left)} 元`} · 已用 ${used}%</p>
   </div>`;
 }
 
-const ledgerSource = () => ({ history: archive?.data, cutoff: billing.reportCutoff(archive), historyThrough: billing.historyEnd(archive),
-  records, mappings: context.settings()?.billingGroups, through: monthKey() });
+const ledgerSource = () => ({ records, mappings: context.settings()?.billingGroups, through: monthKey() });
+const fundConfig = () => context.settings()?.fund;
+const fundQuota = (person, month) => billing.monthlyBudget(context.settings(), person, month);
+const fundLedger = () => billing.fundLedger({ ...ledgerSource(), fund: fundConfig(), quotaFor: fundQuota });
 /* ---------- 加總格的提示：月份格逐筆列日期、內容、金額；跨月的合計格列各月金額 ---------- */
 const TIP_MAX = 40;
 const fmt = (n) => `${n < 0 ? '−' : ''}${money(Math.abs(n))}`;
@@ -259,8 +255,6 @@ function entriesTip(list, withItem = true) {
 /** 跨月合計格：[月份, 金額] 逐月列出，0 與缺資料略過。 */
 const monthsTip = (pairs) => pairs.filter(([, v]) => v).map(([month, v]) => `${Number(month.slice(5))}月 ${fmt(v)}`).join('\n');
 
-const sourceTitle = (m) => m.source === 'history' ? '歷史月結' : m.source === 'missing' ? '缺少歷史' : '即時記帳';
-
 /** 占比：所選年度或全部年度的大項、分類占比，以及日常內容 Top 10（例如全聯）。 */
 function shareView() {
   const now = monthKey();
@@ -288,8 +282,8 @@ const reconciledHint = (payer) => {
   return date ? `<span class="setting-hint" title="存摺／網銀明細核對到這天，之後的交易還沒對帳">已對帳至 ${esc(String(date).replaceAll('-', '/'))}</span>` : '';
 };
 
-/** 這一年的年末均攤還沒記、而且已到 12 月，原表也沒有接著的下一年時，可以記下兩筆。 */
-const settleOpen = (s) => s && !s.recorded && s.total < 0 && monthKey() >= `${s.year}-12` && !archive?.data?.[String(Number(s.year) + 1)];
+/** 今年或去年的年末均攤還沒記、而且已到那年 12 月時，可以記下兩筆。 */
+const settleOpen = (s) => s && !s.recorded && s.total < 0 && monthKey() >= `${s.year}-12` && Number(s.year) >= Number(monthKey().slice(0, 4)) - 1;
 
 /**
  * 公積金年末結算（一張表）：每月分幾行，固定（每月額度）－支出（自己付的）＝赤盈（原表的每月赤盈），
@@ -298,9 +292,8 @@ const settleOpen = (s) => s && !s.recorded && s.total < 0 && monthKey() >= `${s.
  * 有結餘各自轉入下一年。年末均攤本身不算額外，列在均攤那列。
  */
 function settlementTable(s, months) {
-  const anchor = archive?.data?.[String(Number(year) + 1)] && billing.fundSettlement({ ledger: billing.fundLedger({ ...ledgerSource(), members: fundMembers(), quotaFor: fundQuota }), history: archive.data, year: String(Number(year) + 1) });
   const signedCell = (n) => `<span class="${n < 0 ? 'is-expense' : n > 0 ? 'is-income' : ''}">${n ? signed(n) : '0'}</span>`;
-  const isSettle = (e) => billing.SETTLE_NOTE.test(e.note || '');
+  const isSettle = (e) => e.settlement;
   // 平常的額度＝這一年最常見的額度；多出來的當成額外。
   const usual = s.shares.map((_, i) => {
     const count = new Map();
@@ -330,8 +323,7 @@ function settlementTable(s, months) {
       hasExtra ? line('', '額外', parts.map((x) => `<td${x.extra ? tipAttr(x.extras.map((e) => [e.date && day(e.date), e.note, signed(e.amount)].filter(Boolean).join(' ')).join('\n')) : ''}>${x.extra ? signedCell(x.extra) : ''}</td>`)) : '',
     ].join('');
   }).join('');
-  // 下一年原表 1 月的結餘是上一年轉入的金額，不同時標出。
-  const yearEnd = (sh, i) => `${signedCell(sh.balance)}${anchor && anchor.shares[i].carry !== s.next[i] ? `<small class="is-expense" title="原表轉入 ${Number(year) + 1} 年 ${money(anchor.shares[i].carry)}">原表 ${signed(anchor.shares[i].carry)}</small>` : ''}`;
+  const yearEnd = (sh) => signedCell(sh.balance);
   const settleCell = (sh) => {
     if (!s.recorded) return `<span title="${esc(sh.note)}">${money(sh.pay)}</span>`;
     const diff = sh.settled - sh.pay;
@@ -341,12 +333,12 @@ function settlementTable(s, months) {
   const [a, b] = s.shares, gap = s.total < 0 ? a.pay + a.balance : 0;
   const settled = s.shares.reduce((t, sh) => t + sh.settled, 0);
   const partial = s.through < `${year}-12`;
-  const totalLine = [`合計 ${signed(s.total)}`, s.total < 0 && gap ? `${gap > 0 ? `${a.name}貼${b.name}` : `${b.name}貼${a.name}`} ${money(Math.abs(gap))}` : '',
+  const totalLine = [`合計 ${signed(s.total)}`, s.total < 0 && gap ? `${gap > 0 ? `${esc(a.name)}貼${esc(b.name)}` : `${esc(b.name)}貼${esc(a.name)}`} ${money(Math.abs(gap))}` : '',
     s.total < 0 && s.recorded ? `均攤後還剩 ${signed(s.total + settled)}，不轉入下一年` : '', s.total >= 0 ? `轉入 ${Number(year) + 1}` : ''].filter(Boolean).join(' · ');
   const yearHead = `<th scope="rowgroup" rowspan="6">全年</th>`;
-  return `<div class="card fund-settle"><div class="section-head"><h3 class="section-title" title="每月固定（額度）－自己付的支出（含轉進土銀、郵局的錢）＝赤盈，額外另列（上一年的結轉算在 1 月）；公積金名下的收支同原表不算；年底赤盈＝赤盈加總＋額外加總；合計超支兩人各付一半（記成 12 月的年末均攤），有結餘各自轉入下一年">${year} 公積金</h3>${partial ? `<span class="setting-hint">到 ${Number(s.through.slice(5))} 月</span>` : ''}</div>
+  return `<div class="card fund-settle"><div class="section-head"><h3 class="section-title" title="每月固定（額度）－自己付的支出（含轉進土銀、郵局的錢）＝赤盈，額外另列（上一年的結轉算在 1 月）；公積金名下的收支不算；年底赤盈＝赤盈加總＋額外加總；合計超支兩人各付一半（記成 12 月的年末均攤），有結餘各自轉入下一年">${year} 公積金</h3>${partial ? `<span class="setting-hint">到 ${Number(s.through.slice(5))} 月</span>` : ''}</div>
     <div class="report-table-wrap" tabindex="0" aria-label="可捲動公積金"><table class="report-table settle-table"><thead>
-      <tr><th scope="col">月份</th><th scope="col" aria-label="項目"></th>${s.shares.map((sh) => `<th scope="col"${tipAttr(sh.member)}>${sh.name}</th>`).join('')}</tr>
+      <tr><th scope="col">月份</th><th scope="col" aria-label="項目"></th>${s.shares.map((sh) => `<th scope="col"${tipAttr(sh.member)}>${esc(sh.name)}</th>`).join('')}</tr>
     </thead><tbody>
       ${rows}
       ${line(yearHead, '固定', sums.map((x) => `<td>${money(x.quota)}</td>`), 'report-total settle-sub')}
@@ -362,13 +354,13 @@ function settlementTable(s, months) {
 }
 
 async function recordSettlement(button) {
-  const s = billing.fundSettlement({ ledger: billing.fundLedger({ ...ledgerSource(), members: fundMembers(), quotaFor: fundQuota }), history: archive?.data, year });
+  const s = billing.fundSettlement({ ledger: fundLedger(), fund: fundConfig(), year });
   if (!settleOpen(s) || !confirm(`在 ${year}/12/31 記下年末均攤：${s.shares.map((sh) => `${sh.member} ${money(sh.pay)}`).join('、')}？`)) return;
   button.disabled = true;
-  const entries = s.shares.map((sh) => ({ type: 'income', date: `${year}-12-31`, amount: sh.pay, category: '其他', by: sh.member, note: sh.note }));
+  const entries = s.shares.map((sh) => ({ type: 'income', kind: 'settlement', date: `${year}-12-31`, amount: sh.pay, category: '其他', by: sh.member, note: sh.note }));
   try {
     // 另一支手機已經記過就不重複寫。
-    const done = await context.addMany(entries, (list) => list.some((it) => it.type === 'income' && billing.SETTLE_NOTE.test(it.note || '')));
+    const done = await context.addMany(entries, (list) => list.some(billing.isSettlement));
     context.toast?.(done === false ? '這一年已經記過年末均攤' : '已記下年末均攤');
   } catch (err) {
     context.toast?.(err.message || '寫入失敗');
@@ -376,44 +368,36 @@ async function recordSettlement(button) {
   await refresh();
 }
 
-const fundMembers = () => (context.settings()?.people || []).filter((p) => !billing.ACCOUNTS.includes(p));
-const fundQuota = (person, month) => billing.monthlyBudget(context.settings(), person, month);
-
-/** 公積金帳：公婆額度與額外收入，支付房、女兒、兒子與日常；餘額跨年連續，原表結餘當對帳點。 */
+/** 公積金帳：公婆額度與額外收入，支付房、女兒、兒子與日常；餘額跨年連續。 */
 function fundView() {
-  const members = fundMembers();
-  const ledger = billing.fundLedger({ ...ledgerSource(), members, quotaFor: fundQuota });
+  const fund = fundConfig(), shares = fund?.shares || [], members = shares.map((sh) => sh.member);
+  const ledger = fundLedger();
   const summary = billing.fundYear(ledger, year);
   if (!summary.months.length) return '<div class="card"><p class="empty">這一年沒有公積金紀錄</p></div>';
-  const settlement = billing.fundSettlement({ ledger, history: archive?.data, year });
-  const diffs = ledger.filter((m) => m.diff);
-  const gaps = summary.months.filter((m) => m.settlement?.gap);
+  const settlement = billing.fundSettlement({ ledger, fund, year });
   const shareCell = (m, sh) => {
-    if (m.source === 'missing') return '<td>—</td>';
     const extra = sh.extras.reduce((s, e) => s + e.amount, 0);
-    const tip = [sh.member && sh.member !== sh.name ? sh.member : '', `額度 ${money(sh.quota)}`, sh.carry && `${sh.carry.note} ${money(sh.carry.amount)}`,
+    const tip = [sh.member && sh.member !== sh.name ? sh.member : '', `額度 ${money(sh.quota)}`,
       ...sh.extras.map((e) => [day(e.date), e.note || '額外', money(e.amount)].filter(Boolean).join(' '))].filter(Boolean).join('\n');
-    return `<td title="${esc(tip)}">${sh.quota ? money(sh.quota) : ''}${extra ? `<small>+${money(extra)}</small>` : ''}${sh.carry ? `<small>結餘 ${money(sh.carry.amount)}</small>` : ''}</td>`;
+    return `<td title="${esc(tip)}">${sh.quota ? money(sh.quota) : ''}${extra ? `<small>+${money(extra)}</small>` : ''}</td>`;
   };
   // 支出格逐筆：公婆付的支出，自己付的水電氣併入日常（同 fundLedger）。
-  const fundTip = (m, k) => m.source !== 'transactions' ? '' : entriesTip(monthEntries(m.month).filter((e) => members.includes(e.by) && (k === '日常' ? ['日常', '水電氣'].includes(e.group) : e.group === k)));
-  // 1 月的期初：原表開始逐人結算那年、上一年結餘轉入，或記過年末均攤後歸零。
-  const openingBadge = (o) => !o ? '' : o.first ? `<small title="原表這一年開始逐人結算，以 1 月的結餘／上月超支為期初">期初 ${signed(o.amount)}</small>`
+  const fundTip = (m, k) => entriesTip(monthEntries(m.month).filter((e) => members.includes(e.by) && (k === '日常' ? ['日常', '水電氣'].includes(e.group) : e.group === k)));
+  // 1 月的期初：開始逐人結算那年、上一年結餘轉入，或記過年末均攤後歸零。
+  const openingBadge = (o) => !o ? '' : o.first ? `<small title="這個月開始逐人結算，期初是設定裡的結轉">期初 ${signed(o.amount)}</small>`
     : 'residual' in o ? (o.residual ? `<small class="is-expense" title="上一年記過年末均攤，依規則歸零；均攤後還剩 ${signed(o.residual)}，即年末結算的「差」">均攤差 ${signed(o.residual)}</small>` : '<small title="上一年記過年末均攤，依規則歸零">歸零</small>')
     : o.amount ? `<small title="上一年的結餘轉入">轉入 ${signed(o.amount)}</small>` : '';
   const items = summary.transfer ? [...billing.FUND_ITEMS, '轉帳'] : billing.FUND_ITEMS;
-  const value = (m, k) => k === '轉帳' ? m.transfer : m.expenses?.[k];
+  const value = (m, k) => k === '轉帳' ? m.transfer : m.expenses[k];
   const shareTotal = (m, i) => m.shares[i].quota + m.shares[i].extras.reduce((t, e) => t + e.amount, 0);
   return `<div class="tiles billing-tiles">${[['額度', summary.quota], ['額外', summary.extra], ['支出', summary.expense], [year === monthKey().slice(0, 4) ? '目前餘額' : '年底餘額', summary.balance]].map(([name, value]) =>
       `<div class="tile"><div class="tile-label">${name}</div><div class="tile-value">${amount(value)}</div></div>`).join('')}</div>
-    ${diffs.length ? `<p class="report-notice fund-diffs" title="原表年初結餘或上月超支與前期推算的餘額不同，之後餘額以原表為準">結餘不符：${diffs.map((m) => `${m.month} ${signed(m.diff)}`).join('、')}</p>` : ''}
-    ${gaps.length ? `<p class="report-notice fund-gaps" title="公赤盈＋婆赤盈應等於額度合計－月消費總額">赤盈不符：${gaps.map((m) => `${Number(m.month.slice(5))} 月 ${signed(m.settlement.gap)}`).join('、')}</p>` : ''}
-    ${settlement ? settlementTable(settlement, summary.months) : `<div class="card"><h3 class="section-title" title="原表 2022 年起才逐人結算">${year} 公積金帳</h3>
-      <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動公積金帳"><table class="report-table fund-table"><thead><tr><th scope="col">月份</th>${billing.FUND_SHARES.map((name, i) => `<th scope="col" title="${esc(members[i] || name)}：額度，小字為額外加入或結餘">${name}</th>`).join('')}${items.map((k) => `<th scope="col"${k === '轉帳' ? ' title="轉進土銀、郵局的錢"' : ''}>${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
-        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th>${m.shares.map((sh) => shareCell(m, sh)).join('')}${items.map((k) => `<td${value(m, k) && k !== '轉帳' ? tipAttr(fundTip(m, k)) : ''}>${m.expenses ? (value(m, k) ? money(value(m, k)) : '') : '—'}</td>`).join('')}<td>${amount(m.balance)}${m.opening ? openingBadge(m.opening) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.balance - m.income + m.expense)}，前期推算 ${money(m.balance - m.income + m.expense - m.diff)}">差 ${signed(m.diff)}</small>` : ''}${m.settlement?.gap ? `<small class="is-expense" title="公赤盈＋婆赤盈 ${money(m.settlement.amounts[0] + m.settlement.amounts[1])}，額度－月消費總額 ${money(m.settlement.expected)}">赤盈 ${signed(m.settlement.gap)}</small>` : ''}</td></tr>`).join('')}
-        <tr class="report-total"><th scope="row">合計</th>${billing.FUND_SHARES.map((_, i) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, shareTotal(m, i)])))}>${money(summary.months.reduce((s, m) => s + shareTotal(m, i), 0))}</td>`).join('')}${items.map((k) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, value(m, k)])))}>${money(summary.months.reduce((s, m) => s + (value(m, k) || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
+    ${settlement ? settlementTable(settlement, summary.months) : `<div class="card"><h3 class="section-title" title="開始逐人結算以前沒有餘額">${year} 公積金帳</h3>
+      <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動公積金帳"><table class="report-table fund-table"><thead><tr><th scope="col">月份</th>${shares.map((sh) => `<th scope="col" title="${esc(sh.member)}：額度，小字為額外加入">${esc(sh.name)}</th>`).join('')}${items.map((k) => `<th scope="col"${k === '轉帳' ? ' title="轉進土銀、郵局的錢"' : ''}>${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
+        ${summary.months.map((m) => `<tr><th scope="row">${Number(m.month.slice(5))} 月</th>${m.shares.map((sh) => shareCell(m, sh)).join('')}${items.map((k) => `<td${value(m, k) && k !== '轉帳' ? tipAttr(fundTip(m, k)) : ''}>${value(m, k) ? money(value(m, k)) : ''}</td>`).join('')}<td>${amount(m.balance)}${openingBadge(m.opening)}</td></tr>`).join('')}
+        <tr class="report-total"><th scope="row">合計</th>${shares.map((_, i) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, shareTotal(m, i)])))}>${money(summary.months.reduce((s, m) => s + shareTotal(m, i), 0))}</td>`).join('')}${items.map((k) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, value(m, k)])))}>${money(summary.months.reduce((s, m) => s + (value(m, k) || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
       </tbody></table></div></div>`}
-    ${summary.shared ? `<p class="setting-hint" title="公積金名下（Shareroo 共同皮包）的收支，同原表不算進公婆的公積金">共同皮包另付 ${money(summary.shared)}</p>` : ''}`;
+    ${summary.shared ? `<p class="setting-hint" title="公積金名下（Shareroo 共同皮包）的收支，不算進公婆的公積金">共同皮包另付 ${money(summary.shared)}</p>` : ''}`;
 }
 
 /** 房貸：已結清的歷史紀錄。存摺上的每筆扣款，利息由月繳變動反推（billing.loanSchedule）。 */
@@ -457,61 +441,41 @@ function postView() {
       </tbody></table></div></div>`;
 }
 
-/** 土銀帳：歷年水電氣入款與扣款，餘額跨年連續；原表結餘當對帳點。 */
+/** 土銀帳：歷年水電氣入款與扣款，餘額跨年連續。 */
 function bankView() {
   const ledger = billing.bankLedger(ledgerSource());
   const summary = billing.bankYear(ledger, year);
   if (!summary.months.length) return '<div class="card"><p class="empty">這一年沒有土銀紀錄</p></div>';
-  const diffs = ledger.filter((m) => m.diff);
   const items = billing.BANK_ITEMS.filter((k) => k !== '其他' || summary.months.some((m) => m.expenses.其他));
-  const incomeTip = (m) => [m.opening && `${m.opening.note} ${money(m.opening.amount)}`, ...m.incomes.map((i) => [day(i.date), i.note || '入款', money(i.amount)].filter(Boolean).join(' '))].filter(Boolean).join('\n');
+  const incomeTip = (m) => m.incomes.map((i) => [day(i.date), i.note || '入款', money(i.amount)].filter(Boolean).join(' ')).join('\n');
   // 扣款格逐筆：記在土銀名下的支出，水電氣以外歸「其他」（同 bankLedger）。
-  const bankTip = (m, k) => m.source !== 'transactions' ? '' : entriesTip(monthEntries(m.month).filter((e) => e.by === billing.UTILITY_PAYER && e.amount > 0 &&
+  const bankTip = (m, k) => entriesTip(monthEntries(m.month).filter((e) => e.by === billing.UTILITY_PAYER && e.amount > 0 &&
     (e.group === '水電氣' && billing.BANK_ITEMS.includes(e.item) ? e.item : '其他') === k), false);
-  const cell = (m, value) => m.source === 'missing' ? '—' : value ? money(value) : '';
+  const cell = (value) => value ? money(value) : '';
   // 有年度預算時，扣款就是預算條上的已用金額，不另放一格。
   const budget = utilityBudgetView(summary);
   return `<div class="tiles billing-tiles">${[['入款', summary.income], !budget && ['扣款', summary.expense], [year === monthKey().slice(0, 4) ? '目前餘額' : '年底餘額', summary.balance]].filter(Boolean).map(([name, value]) =>
       `<div class="tile"><div class="tile-label">${name}</div><div class="tile-value">${amount(value)}</div></div>`).join('')}</div>
     ${budget}
-    ${diffs.length ? `<p class="report-notice bank-diffs" title="原表年初結餘與前期推算的餘額不同，之後餘額以原表為準">結餘不符：${diffs.map((m) => `${m.month} ${signed(m.diff)}`).join('、')}</p>` : ''}
     <div class="card"><div class="section-head"><h3 class="section-title">${year} 土銀帳</h3>${reconciledHint(billing.UTILITY_PAYER)}</div>
-      <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動土銀帳"><table class="report-table bank-table"><thead><tr><th scope="col">月份</th><th scope="col" title="結餘是對帳點，不算入款；含公婆轉入">入款</th>${items.map((k) => `<th scope="col"${k === '其他' ? ' title="水電以外的扣款，例如 2021 年以前的房貸"' : ''}>${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
-        ${summary.months.map((m) => `<tr><th scope="row" title="${sourceTitle(m)}">${Number(m.month.slice(5))} 月</th><td${incomeTip(m) ? ` title="${esc(incomeTip(m))}"` : ''}>${cell(m, m.income)}${m.opening ? `<small>結餘 ${money(m.opening.amount)}</small>` : ''}</td>${items.map((k) => `<td${m.expenses[k] ? tipAttr(bankTip(m, k)) : ''}>${cell(m, m.expenses[k])}</td>`).join('')}<td>${amount(m.balance)}${m.adjust ? adjustBadge(m) : m.diff ? `<small class="is-expense" title="原表結餘 ${money(m.opening.amount)}，前期推算 ${money(m.opening.amount - m.diff)}">差 ${signed(m.diff)}</small>` : ''}</td></tr>`).join('')}
+      <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動土銀帳"><table class="report-table bank-table"><thead><tr><th scope="col">月份</th><th scope="col" title="含公婆轉入">入款</th>${items.map((k) => `<th scope="col"${k === '其他' ? ' title="水電以外的扣款，例如 2021 年以前的房貸"' : ''}>${k}</th>`).join('')}<th scope="col">餘額</th></tr></thead><tbody>
+        ${summary.months.map((m) => `<tr><th scope="row">${Number(m.month.slice(5))} 月</th><td${incomeTip(m) ? ` title="${esc(incomeTip(m))}"` : ''}>${cell(m.income)}</td>${items.map((k) => `<td${m.expenses[k] ? tipAttr(bankTip(m, k)) : ''}>${cell(m.expenses[k])}</td>`).join('')}<td>${amount(m.balance)}${adjustBadge(m)}</td></tr>`).join('')}
         <tr class="report-total"><th scope="row">合計</th><td${tipAttr(monthsTip(summary.months.map((m) => [m.month, m.income])))}>${money(summary.income)}</td>${items.map((k) => `<td${tipAttr(monthsTip(summary.months.map((m) => [m.month, m.expenses[k]])))}>${money(summary.months.reduce((s, m) => s + (m.expenses[k] || 0), 0))}</td>`).join('')}<td>${amount(summary.balance)}</td></tr>
       </tbody></table></div></div>`;
 }
 
 function yearView() {
-  const n = elapsed(year), months = monthsFor(year), current = months.slice(0, n).filter((m) => m.source !== 'pending');
-  const totals = billing.reportTotals(current);
-  const previous = billing.reportTotals(monthsFor(String(Number(year) - 1)).filter((m, i) => i < n && months[i].source !== 'pending'));
-  const hasPending = months.slice(0, n).some((m) => m.source === 'pending');
-  const label = n === 0 ? '未到年度' : `${periodLabel(months, n)}${year === monthKey().slice(0, 4) && months[n - 1]?.source === 'transactions' ? '（含本月）' : ''}`;
-  const conflicts = current.filter((m) => m.conflict);
-  const missing = current.some((m) => m.source === 'missing');
+  const n = elapsed(year), months = monthsFor(year);
+  const totals = billing.reportTotals(months.slice(0, n));
+  const previous = billing.reportTotals(monthsFor(String(Number(year) - 1)).slice(0, n));
+  const label = n === 0 ? '未到年度' : `${periodLabel(n)}${year === monthKey().slice(0, 4) ? '（含本月）' : ''}`;
   return `${summaryTiles(totals, label, n ? previous : null)}
-    ${missing ? '<p class="report-notice">部分月份缺資料，合計顯示「—」</p>' : ''}
-    ${hasPending ? '<p class="report-notice">待補月結月份不計入合計</p>' : ''}
-    ${conflicts.length ? `<p class="report-notice">${conflicts.map((m) => m.month).join('、')} 只採歷史月結</p>` : ''}
-    ${current.some((m) => m.daily < 0) ? '<p class="report-notice">歷史扣除列項後開銷有負值，請核對</p>' : ''}
     ${charts.monthly(year)}
-    ${yearTable(months, n, totals)}${detailMonth ? detailView(months.find((m) => m.month === detailMonth)) : ''}`;
+    ${yearTable(months, n, totals)}`;
 }
 
-const sourceLabel = (source) => ({ history: '歷史月結', transactions: '即時記帳', pending: '待補月結', missing: '缺少歷史' }[source] || '—');
-
-function periodLabel(months, n) {
-  const included = months.slice(0, n).map((m, i) => m.source === 'pending' ? null : i + 1).filter(Boolean);
-  if (!included.length) return '尚無已入帳月份';
-  const ranges = [];
-  for (const month of included) {
-    const last = ranges.at(-1);
-    if (last && month === last[1] + 1) last[1] = month;
-    else ranges.push([month, month]);
-  }
-  return ranges.map(([a, b]) => a === b ? String(a) : `${a}–${b}`).join('、') + ' 月';
-}
+/** 已過的月份：1–n 月。 */
+const periodLabel = (n) => (n === 1 ? '1' : `1–${n}`) + ' 月';
 
 /** 年度明細：列是大項（點開看項目），欄是月份；月消費總額與家庭總支出接在算進它們的大項後面。 */
 const YEAR_GROUPS = [['房', 'house'], ['女兒', 'daughter'], ['兒子', 'son'], ['日常', 'daily', '扣除列項後開銷']];
@@ -522,15 +486,15 @@ const itemRank = (group, item) => {
 
 function yearTable(months, n, totals) {
   const items = billing.classificationMatrix(months);
-  const counted = (i) => i < n && !['pending', 'missing'].includes(months[i].source);
+  const counted = (i) => i < n;
   // 大項與項目的 0 留空比較好讀；總額列照常顯示。
-  // tip(m) 回傳某月那一格的明細；即時記帳的月份才有逐筆交易。
+  // tip(m) 回傳某月那一格的逐筆明細。
   const cells = (pick, blankZero = true, tip = () => '') => months.map((m, i) => {
     const v = i >= n ? '' : pick(m, i);
     const blank = v === '' || (blankZero && v === 0);
-    return `<td data-month="${m.month}"${i >= n ? ' class="is-future"' : ''}${blank || v === null ? '' : tipAttr(tip(m, i))}>${blank ? '' : amount(v)}</td>`;
+    return `<td data-month="${m.month}"${i >= n ? ' class="is-future"' : ''}${blank ? '' : tipAttr(tip(m, i))}>${blank ? '' : amount(v)}</td>`;
   }).join('');
-  const entries = (m, keep, withItem) => m.source === 'transactions' ? entriesTip(monthEntries(m.month).filter(keep), withItem) : '';
+  const entries = (m, keep, withItem) => entriesTip(monthEntries(m.month).filter(keep), withItem);
   const sumTip = (value) => tipAttr(monthsTip(months.map((m, i) => [m.month, counted(i) ? value(m, i) : null])));
   const group = ([name, key, tip]) => {
     const open = openGroups.has(name);
@@ -546,7 +510,7 @@ function yearTable(months, n, totals) {
   const parts = { monthlyTotal: [['房', 'house'], ['女兒', 'daughter'], ['兒子', 'son'], ['日常', 'daily']], total: [['月消費總額', 'monthlyTotal'], ['水電氣', 'utilities']] };
   const partsTip = (key) => (m) => parts[key].map(([name, k]) => `${name} ${amount(m[k])}`).join('\n');
   const total = (key, label, tip) => `<tbody><tr class="report-total" data-total="${key}"><th scope="row" title="${tip}">${label}</th>${cells((m) => m[key], false, partsTip(key))}<td class="year-sum"${sumTip((m) => m[key])}>${amount(totals[key])}</td></tr></tbody>`;
-  const head = months.map((m, i) => `<th scope="col"${i >= n ? ' class="is-future"' : ''} title="${i >= n ? '未到月份' : m.source === 'transactions' ? '到本月看這個月' : `${sourceLabel(m.source)}，點開看當月明細`}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1}月</button>${i < n && ['pending', 'missing'].includes(m.source) ? `<small>${sourceLabel(m.source)}</small>` : ''}</th>`).join('');
+  const head = months.map((m, i) => `<th scope="col"${i >= n ? ' class="is-future"' : ''} title="${i >= n ? '未到月份' : '到本月看這個月'}"><button type="button" class="text-button" data-billing-month="${m.month}">${i + 1}月</button></th>`).join('');
   return `<div class="card"><h3 class="section-title" title="點大項看底下的項目，點月份看那個月">年度明細</h3>
     <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動年度明細"><table class="report-table group-table year-table"><thead><tr><th scope="col">項目</th>${head}<th scope="col">合計</th></tr></thead>
       ${YEAR_GROUPS.map(group).join('')}
@@ -556,37 +520,24 @@ function yearTable(months, n, totals) {
     </table></div></div>`;
 }
 
-function detailView(m) {
-  if (!m) return '';
-  if (m.month > monthKey()) return `<div class="card" id="billing-detail"><h3>${m.month}</h3><p class="empty">未到月份</p></div>`;
-  if (m.source === 'missing') return `<div class="card" id="billing-detail"><h3>${m.month}</h3><p class="empty">沒有歷史月結資料</p></div>`;
-  if (m.source === 'pending') return `<div class="card" id="billing-detail"><h3>${m.month} 待補月結</h3><p class="setting-hint">不計入年度合計${m.testCount ? ` · ${m.testCount} 筆測試交易` : ''}</p>${m.testCount ? '<button class="btn-quiet" type="button" id="billing-show-records">查看測試交易</button>' : ''}</div>`;
-  const lines = (m.details || []).filter((d) => d.amount || d.note);
-  return `<div class="card" id="billing-detail"><h3 class="section-title" title="保留原始列與備註，各列不再相加">${m.month} 原月結明細</h3>
-    ${lines.length ? lines.map((d) => `<div class="setting-row"><div><div class="setting-name">${esc(d.item)}</div><p class="setting-hint">${esc(d.group)}${d.note ? ` · ${esc(d.note)}` : ''}</p></div><strong>${amount(d.amount)}</strong></div>`).join('') : '<p class="empty">這個月沒有費用紀錄</p>'}
-  </div>`;
-}
-
 /** 跨年：費用趨勢圖，加上各年同期的分類細項 YOY。列照年度明細排：總覽列點開看底下的項目，月消費總額與家庭總支出接在算進它們的大項後面。 */
-const COMPARE_ROWS = [['房', '房'], ['女兒', '女兒'], ['兒子', '兒子'], ['日常', '扣除列項後開銷'], ['', '月消費總額（不含水電氣）'], ['水電氣', '水電氣'], ['', '家庭總支出'], ['家用'], ['Shareroo'], ['收入']];
+const COMPARE_ROWS = [['房', '房'], ['女兒', '女兒'], ['兒子', '兒子'], ['日常', '扣除列項後開銷'], ['', '月消費總額（不含水電氣）'], ['水電氣', '水電氣'], ['', '家庭總支出'], ['收入']];
 
 function compareView() {
-  const years = charts.years().sort((a, b) => b - a), n = elapsed(year), reference = monthsFor(year);
-  const selected = (y) => monthsFor(y).filter((m, i) => i < n && reference[i].source !== 'pending');
+  const years = charts.years().sort((a, b) => b - a), n = elapsed(year);
   const options = charts.itemOptions();
   const itemMonths = new Map();
   for (const y of new Set(years.flatMap((y) => [y, String(Number(y) - 1)]))) {
-    itemMonths.set(y, selected(y).map((month) => ({ month, entries: billing.monthItems(month) })));
+    itemMonths.set(y, monthsFor(y).slice(0, n).map((month) => ({ month, entries: billing.monthItems(month) })));
   }
   const sum = (y, key) => {
     const values = itemMonths.get(y).map(({ month, entries }) => billing.itemValue(month, key, entries));
-    if (JSON.parse(key)[1] === '餘額') return values.at(-1) ?? null;
-    return !values.length || values.some((v) => v === null) ? null : values.reduce((s, v) => s + v, 0);
+    return values.length ? values.reduce((s, v) => s + v, 0) : null;
   };
   const cells = (key, item = '') => years.map((y) => {
     const current = sum(y, key), prev = sum(String(Number(y) - 1), key);
     const tip = monthsTip(itemMonths.get(y).map(({ month, entries }) => [month.month, billing.itemValue(month, key, entries)]));
-    return `<td${current === null ? '' : tipAttr(tip)}>${amount(current)}${deltaBadge(current, prev, ['收入', '餘額'].includes(item))}</td>`;
+    return `<td${current === null ? '' : tipAttr(tip)}>${amount(current)}${deltaBadge(current, prev, item === '收入')}</td>`;
   }).join('');
   const row = ([group, overview]) => {
     if (!group) return `<tbody><tr class="report-total">${overview === '家庭總支出' ? '<th scope="row" title="月消費總額＋水電氣">家庭總支出</th>' : '<th scope="row" title="房、女兒、兒子與日常">月消費總額<small>不含水電氣</small></th>'}${cells(billing.itemKey('總覽', overview))}</tr></tbody>`;
@@ -598,7 +549,7 @@ function compareView() {
     const body = open ? items.map((o) => `<tr class="item-row"><th scope="row">${esc(o.item)}</th>${cells(o.key, o.item)}</tr>`).join('') : '';
     return `<tbody>${head}${body}</tbody>`;
   };
-  return `${charts.growth()}<div class="card"><h3 class="section-title" title="增減以去年同期為基準；待補月份不加入比較，去年為零或資料不足不計百分比">各年 ${n ? periodLabel(reference, n) : '同期'}</h3>
+  return `${charts.growth()}<div class="card"><h3 class="section-title" title="增減以去年同期為基準；去年為零或資料不足不計百分比">各年 ${n ? periodLabel(n) : '同期'}</h3>
     <div class="report-table-wrap" tabindex="0" aria-label="可左右捲動跨年比較"><table class="report-table group-table"><thead><tr><th scope="col">項目</th>${years.map((y) => `<th scope="col">${y}</th>`).join('')}</tr></thead>
       ${COMPARE_ROWS.map(row).join('')}
     </table></div></div>`;
@@ -611,7 +562,6 @@ function deltaBadge(current, previous, goodWhenUp = false) {
   return `<small class="yoy-delta ${cls}">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</small>`;
 }
 
-export const selectedDetailMonth = () => detailMonth;
 
 /** 全部月份的紀錄：同步一次月份目錄，只重讀有變更的月份。 */
 export async function loadAll() {

@@ -3,7 +3,6 @@ import { monthKey, money } from './calc.js';
 import { stackedChart, lineChart } from './charts.js';
 import { esc } from './html.js';
 const colors = ['#38bdf8', '#4ade80', '#f472b6', '#a78bfa', '#fbbf24', '#f87171', '#2dd4bf'];
-const sourceNote = (m) => ({ history: '歷史月結', transactions: '即時記帳', pending: '待補月結', missing: '缺少歷史' }[m.source]);
 
 export class ReportCharts {
   constructor(root, context) {
@@ -70,13 +69,12 @@ export class ReportCharts {
   }
 
   years() {
-    return this.context.years().filter((y) => y <= monthKey().slice(0, 4) && (y === monthKey().slice(0, 4) || this.context.months(y).some((m) => m.source === 'history' || m.details?.length))).sort();
+    return this.context.years().filter((y) => y <= monthKey().slice(0, 4) && (y === monthKey().slice(0, 4) || this.context.months(y).some((m) => m.details.length))).sort();
   }
 
   monthPoints(year) {
     return this.context.months(year).map((m, i) => ({ key: m.month, label: `${i + 1}月`, total: m.total, values: m,
-      available: m.month <= monthKey() && ['history', 'transactions'].includes(m.source) && m.total !== null,
-      note: m.month > monthKey() ? '未到月份' : sourceNote(m) }));
+      available: m.month <= monthKey(), note: m.month > monthKey() ? '未到月份' : '' }));
   }
 
   range(points, id, defaultStart = null) {
@@ -137,7 +135,7 @@ export class ReportCharts {
     for (const year of this.years()) for (const month of this.context.months(year).filter((m) => m.month <= monthKey())) {
       for (const [key, item] of monthItems(month)) options.set(key, { key, group: item.group, item: item.item, name: `${item.group}／${item.item}` });
     }
-    const order = ['總覽', '家用', '水電氣', '房', '女兒', '兒子', 'Shareroo', '日常', '收入'];
+    const order = ['總覽', '水電氣', '房', '女兒', '兒子', '日常', '收入'];
     this.cachedItems = [...options.values()].sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.item.localeCompare(b.item, 'zh-Hant'));
     return this.cachedItems;
   }
@@ -148,21 +146,21 @@ export class ReportCharts {
     let drawing, points, selected, picker = '';
     if (annual) {
       points = years.map((y) => {
-        const months = this.context.months(y).filter((m) => m.month <= monthKey() && m.source !== 'pending');
-        const totals = reportTotals(months), count = months.filter((m) => m.source !== 'missing').length;
-        return { key: y, label: y, values: totals, total: totals.total, available: count > 0 && totals.total !== null,
+        const months = this.context.months(y).filter((m) => m.month <= monthKey());
+        const totals = reportTotals(months), count = months.length;
+        return { key: y, label: y, values: totals, total: totals.total, available: count > 0,
           complete: count === 12 && y < monthKey().slice(0, 4), note: `${count} 個月已入帳${count === 12 ? ' · 全年' : ' · 部分年度'}` };
       });
       selected = this.range(points, 'growth');
       drawing = this.plot('growth', selected.visible, true);
     } else {
       const months = years.flatMap((y) => this.context.months(y).filter((m) => m.month <= monthKey()));
-      points = months.map((m) => ({ key: m.month, label: m.month, total: m.total, month: m, note: sourceNote(m) }));
+      points = months.map((m) => ({ key: m.month, label: m.month, total: m.total, month: m, note: '' }));
       selected = this.range(points, 'growth', points.find((p) => p.key.startsWith(this.context.year()))?.key);
       const options = this.itemOptions();
       const chosen = options.filter((o) => this.selectedItems.has(o.key));
       const entries = selected.visible.map((p) => monthItems(p.month));
-      const series = chosen.map((o, i) => ({ ...o, isBalance: o.item === '餘額', color: colors[i % colors.length], values: selected.visible.map((p, j) => itemValue(p.month, o.key, entries[j])) }));
+      const series = chosen.map((o, i) => ({ ...o, color: colors[i % colors.length], values: selected.visible.map((p, j) => itemValue(p.month, o.key, entries[j])) }));
       const model = lineChart(selected.visible, series, { ...this.options.growth, id: 'growth', fit: this.fitWidth() });
       this.models.set('growth', { ...model, points: selected.visible });
       const filtered = options.filter((o) => o.name.toLocaleLowerCase().includes(this.search.toLocaleLowerCase()));

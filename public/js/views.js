@@ -2,7 +2,7 @@
 
 import * as calc from './calc.js';
 import { budgetFor, all as allSettings } from './settings.js';
-import { transactionSummary, categoryShare, memberSpend, UTILITY_PAYER, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
+import { transactionSummary, categoryShare, memberSpend, UTILITY_PAYER, isMember, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
 import { esc } from './html.js';
 
 const changeSub = (cur, prev) => {
@@ -49,7 +49,7 @@ function budgetCard(items, month, people) {
     index,
     spent: memberSpend(items, person),
     limit: budgetFor(person, month),
-  })).filter((row) => row.person !== UTILITY_PAYER);
+  })).filter((row) => isMember(row.person));
   if (!rows.some((row) => row.limit)) return '';
   return `<div class="card">
     <div class="budget-head"><span class="budget-title">本月額度</span></div>

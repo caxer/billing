@@ -7,7 +7,7 @@ import * as settings from './settings.js';
 import * as calc from './calc.js';
 import * as views from './views.js';
 import { readStored, writeStored, removeStored } from './storage.js';
-import { classify, GROUPS, UTILITY_PAYER, ACCOUNTS, FUND_PAYER, guessCategory, usesPerson, renamePerson } from './billing.js';
+import { classify, GROUPS, UTILITY_PAYER, isMember, guessCategory, usesPerson, renamePerson } from './billing.js';
 import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
 import './open-guide.js';
@@ -953,11 +953,6 @@ function bind() {
     applyUtilityPayer();
   });
 
-  $('#view-billing').addEventListener('click', async (e) => {
-    if (!e.target.closest('#billing-show-records') || working) return;
-    if (await switchMonth(reports.selectedDetailMonth())) show('records');
-  });
-
   $('#add-cancel').addEventListener('click', () => resetForm());
 
   $('#add-delete').addEventListener('click', async () => {
@@ -1075,7 +1070,7 @@ function bindSettings() {
         const name = answer?.trim();
         if (!name || name === from) return;
         if (settings.people().includes(name)) throw new Error(`已經有「${name}」了`);
-        if ([...ACCOUNTS, FUND_PAYER].includes(name)) throw new Error(`「${name}」是帳戶名稱，請換一個`);
+        if (!isMember(name)) throw new Error(`「${name}」是帳戶名稱，請換一個`);
         // 所有月份的紀錄與記事一起改名，歷史月份的額外收入與公積金帳才不會斷成兩個人。
         // 先改紀錄、最後才改名單：中途失敗時名單還是舊名字，再按一次改名就會把剩下的月份補完。
         // 動紀錄前先重讀雲端名單，別支手機剛改過也不會改出重複的名字。
@@ -1106,6 +1101,8 @@ function bindSettings() {
             if (s.budgets[from]) s.budgets[name] = s.budgets[from];
             delete s.budgets[from];
           }
+          // 公積金的公、婆對應的是名字，一起改才不會斷掉。
+          for (const share of s.fund?.shares || []) if (share.member === from) share.member = name;
         });
         if (me === from) {
           me = name;

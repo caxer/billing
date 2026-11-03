@@ -2,7 +2,7 @@
 // 私人 repo 的 settings.json 是真正來源；public/settings.json 只是首次寫入前的預設值。
 
 import * as store from './store.js';
-import { upgradeSettings, UTILITY_PAYER, monthlyBudget } from './billing.js';
+import { upgradeSettings, isMember, monthlyBudget } from './billing.js';
 
 let current = null;
 let writes = Promise.resolve();
@@ -46,9 +46,9 @@ export function people() {
   return current?.people || [];
 }
 
-/** 可以當「這支手機是」的人，不含土銀。 */
+/** 可以當「這支手機是」的人，不含帳戶（土銀、郵局）與公積金。 */
 export function members() {
-  return people().filter((p) => p !== UTILITY_PAYER);
+  return people().filter(isMember);
 }
 
 export function categories(type) {

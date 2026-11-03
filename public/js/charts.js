@@ -98,12 +98,12 @@ export function lineChart(points, series, options) {
   const stats = series.map((s) => seriesStats(s.values));
   const all = series.flatMap((s) => s.values);
   const c = coordinates(points.length, [...all, ...(options.average ? stats.map((s) => s.average) : [])],
-    options.cumulative && stats.flatMap((s, i) => series[i].isBalance ? [] : s.cumulative), options.fit);
+    options.cumulative && stats.flatMap((s) => s.cumulative), options.fit);
   let body = series.map((s, index) => {
     let drawing = `<path class="chart-item-line" data-series="${esc(s.key)}" stroke="${s.color}" d="${path(s.values, c.x, c.y)}"/>`;
     s.values.forEach((v, i) => { if (finite(v)) drawing += `<circle cx="${c.x(i)}" cy="${c.y(v)}" r="3" fill="${s.color}"/>`; });
     if (options.average && finite(stats[index].average)) drawing += `<line class="chart-average-line" data-value="${stats[index].average}" style="stroke:${s.color}" x1="${c.left}" x2="${c.width - c.right}" y1="${c.y(stats[index].average)}" y2="${c.y(stats[index].average)}"/>`;
-    if (options.cumulative && !s.isBalance) drawing += `<path class="chart-item-cumulative" stroke="${s.color}" d="${path(stats[index].cumulative, c.x, c.secondary.y)}"/>`;
+    if (options.cumulative) drawing += `<path class="chart-item-cumulative" stroke="${s.color}" d="${path(stats[index].cumulative, c.x, c.secondary.y)}"/>`;
     if (options.extrema) {
       for (const [label, entries] of [['最高', stats[index].highest], ['最低', stats[index].lowest]]) {
         for (const p of entries.slice(0, 1)) drawing += `<text ${labelAt(c, c.x(p.index))} y="${Math.max(c.top + 14, c.y(p.value) - (label === '最高' ? 10 : 24) - index * 14)}" class="chart-extreme" style="fill:${s.color}" data-extreme="${label}">${label} ${money(p.value)}</text>`;
@@ -111,7 +111,7 @@ export function lineChart(points, series, options) {
     }
     return drawing;
   }).join('');
-  const tooltip = (i) => `<strong>${esc(points[i]?.label)}</strong>${series.map((s, j) => `<span><i class="dot" style="background:${s.color}"></i>${esc(s.name)}：${finite(s.values[i]) ? money(s.values[i]) : '—'}${options.cumulative && !s.isBalance && finite(stats[j].cumulative[i]) ? ` · 累積 ${money(stats[j].cumulative[i])}` : ''}</span>`).join('')}`;
+  const tooltip = (i) => `<strong>${esc(points[i]?.label)}</strong>${series.map((s, j) => `<span><i class="dot" style="background:${s.color}"></i>${esc(s.name)}：${finite(s.values[i]) ? money(s.values[i]) : '—'}${options.cumulative && finite(stats[j].cumulative[i]) ? ` · 累積 ${money(stats[j].cumulative[i])}` : ''}</span>`).join('')}`;
   const empty = !series.length ? '<p class="empty">請選擇要比較的細項。</p>' : '';
   return { html: empty || frame(c, points, body, options.id), tooltip, stats };
 }

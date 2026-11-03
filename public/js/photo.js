@@ -1,4 +1,4 @@
-// 相機照片的讀取與縮圖（與 teacher/public/js/photo.js 相同）：部分 iOS／內建瀏覽器只能用 Image 或 FileReader 解碼。
+// 相機照片的讀取與縮圖（billing 與 teacher 共用，App 根目錄 node scripts/link-key.mjs --sync 同步）：部分 iOS／內建瀏覽器只能用 Image 或 FileReader 解碼。
 function readDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -11,7 +11,7 @@
 
 import { removeStored } from './storage.js';
 import { validDate } from './calc.js';
-import { validMonth, validateHistory, GROUPS } from './billing.js';
+import { GROUPS, KINDS } from './billing.js';
 import './link-key.js';
 import { normalizeDataCredentials } from './data-repo.js';
 
@@ -181,6 +181,7 @@ export function validateItems(items, month) {
         (it.by !== undefined && typeof it.by !== 'string') ||
         (it.note !== undefined && typeof it.note !== 'string') ||
         (it.from !== undefined && typeof it.from !== 'string') ||
+        (it.kind !== undefined && !KINDS.includes(it.kind)) ||
         (it.billingGroup !== undefined && !GROUPS.includes(it.billingGroup)) ||
         (it.createdAt !== undefined && typeof it.createdAt !== 'string')) {
       throw new Error(`${month} 的資料格式損毀`);
@@ -280,29 +281,7 @@ export async function saveSettings(settings, sha) {
   await writeFile('settings.json', payload, sha);
 }
 
-/* ---------- 歷史月結與月份目錄 ---------- */
-
-export function validateArchive(archive) {
-  if (!archive || archive.version !== 2 ||
-      !validMonth(archive.cutoverMonth) || !Array.isArray(archive.years) || archive.years.some((y) => !/^\d{4}$/.test(y))) {
-    throw new Error('歷史月結設定格式損毀');
-  }
-  if (!validMonth(archive.historyThrough) || archive.historyThrough >= archive.cutoverMonth) {
-    throw new Error('歷史截止月份必須早於正式記帳月份');
-  }
-  if (archive.migratedThrough !== undefined && archive.migratedThrough !== archive.historyThrough) throw new Error('歷史轉入記帳的月份與歷史截止月份不同');
-  validateHistory(archive.data);
-  if (JSON.stringify(Object.keys(archive.data).sort()) !== JSON.stringify([...archive.years].sort())) throw new Error('歷史年度清單與資料不一致');
-}
-
-export async function loadHistory() {
-  const found = await readFile('billing-history.json');
-  if (!found) return { archive: null, sha: null };
-  let archive;
-  try { archive = JSON.parse(found.text); validateArchive(archive); }
-  catch { throw new Error('歷史月結設定格式損毀'); }
-  return { archive, sha: found.sha };
-}
+/* ---------- 月份目錄 ---------- */
 
 /** 目錄只列出月份與版本，年表同步只重讀有變更的月檔。 */
 export async function listMonths() {
