@@ -7,7 +7,7 @@ import * as settings from './settings.js';
 import * as calc from './calc.js';
 import * as views from './views.js';
 import { readStored, writeStored, removeStored } from './storage.js';
-import { classify, GROUPS, UTILITY_PAYER, ACCOUNTS, FUND_PAYER, guessCategory } from './billing.js';
+import { classify, GROUPS, UTILITY_PAYER, ACCOUNTS, FUND_PAYER, guessCategory, usesPerson, renamePerson } from './billing.js';
 import * as reports from './reports.js';
 import { initLoginScreen } from './login-screen.js';
 import './open-guide.js';
@@ -1086,20 +1086,17 @@ function bindSettings() {
         const used = [];
         for (let i = 0; i < months.length; i += 6) {
           const loaded = await Promise.all(months.slice(i, i + 6).map((m) => store.loadMonth(m)));
-          used.push(...loaded.filter((d) => d.items.some((it) => it.by === from)).map((d) => d.month));
+          used.push(...loaded.filter((d) => d.items.some((it) => usesPerson(it, from))).map((d) => d.month));
         }
         for (const [i, m] of used.entries()) {
           setSync('busy', `改名 ${i + 1}/${used.length}`);
+          // 轉進土銀、郵局的紀錄用 from 記是誰轉的，要一起改，公積金帳和已花才不會少算。
           await state.mutateMonth(m, (list) => {
-            const hits = list.filter((it) => it.by === from);
-            if (!hits.length) return false;
-            for (const it of hits) it.by = name;
+            if (!renamePerson(list, from, name)) return false;
           });
         }
         await notes.mutate((list) => {
-          const hits = list.filter((it) => it.by === from);
-          if (!hits.length) return false;
-          for (const it of hits) it.by = name;
+          if (!renamePerson(list, from, name)) return false;
         });
         await settings.save((s) => {
           if (!s.people.includes(from)) throw new Error('這位記帳人已被修改，請同步後再試');

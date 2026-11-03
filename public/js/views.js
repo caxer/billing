@@ -2,7 +2,7 @@
 
 import * as calc from './calc.js';
 import { budgetFor, all as allSettings } from './settings.js';
-import { transactionSummary, memberSpend, UTILITY_PAYER, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
+import { transactionSummary, categoryShare, memberSpend, UTILITY_PAYER, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
 import { esc } from './html.js';
 
 const changeSub = (cur, prev) => {
@@ -99,6 +99,12 @@ const incomeLine = (income, sub) => `<div class="tile-income"><span class="tile-
 
 /* ---------- 統計 ---------- */
 
+/** 分類列表的公積金抵扣列（負數、不畫長條）：本月頁與年度占比共用，說明放提示。 */
+export const offsetCat = (name, amount) => `
+          <div class="cat is-offset" title="記在公積金名下的收入（儲值、發票中獎等）抵扣日常；分類合計加這一行＝支出">
+            <span class="cat-name">${esc(name)}</span><span class="cat-pct"></span><span class="cat-amount">${calc.money(amount)}</span>
+          </div>`;
+
 /** 單一色塊：高度是整條柱子的百分比，所以要除以柱子的總高。 */
 const stackSeg = (bucket, person, index, stackTotal) => {
   const amount = bucket.parts.get(person) || 0;
@@ -136,8 +142,9 @@ export function stats(month, items, prevItems, categoryType, people = []) {
   const axis = `<div class="chart-axis">${near(1) ? '<span></span>' : '<span>1 日</span>'}${isThisMonth ? `<span class="chart-today" style="left:${((todayDay - 0.5) / days) * 100}%">${todayDay} 日</span>` : ''}${near(days) ? '<span></span>' : `<span>${days} 日</span>`}</div>`;
   const legend = recordPeople.map((p, i) => `<span class="legend-item"><i class="dot" style="background:${personColor(i)}" aria-hidden="true"></i>${esc(p || '未指定')}</span>`).join('');
 
-  const cats = calc.byCategory(items, categoryType);
-  const catTotal = cats.reduce((a, c) => a + c.total, 0);
+  // 收入分類和收入格同口徑：轉進帳戶與年末均攤不算收入。支出分類是原始金額，另列公積金抵扣，占比只算原始分類。
+  const cats = categoryShare(items, categoryType, mappings);
+  const catTotal = cats.reduce((a, c) => a + (c.offset ? 0 : c.total), 0);
 
   return `
     <div class="stack stats-grid">
@@ -147,7 +154,7 @@ export function stats(month, items, prevItems, categoryType, people = []) {
       ${budgetCard(items, month, people)}
 
       <div class="card">
-        <div class="budget-head"><span class="budget-title">每日支出</span>
+        <div class="budget-head"><span class="budget-title" title="各筆支出的原始金額，未扣公積金抵扣">每日支出</span>
           <span class="budget-num">最高 ${calc.money(peak)}</span></div>
         <div class="chart-plot">
           <div class="bars" role="img" aria-label="${calc.monthLabel(month)}每日支出，最高 ${calc.money(peak)} 元">${bars}</div>
@@ -167,7 +174,7 @@ export function stats(month, items, prevItems, categoryType, people = []) {
             <button type="button" class="seg-btn ${categoryType === 'income' ? 'is-on' : ''}" aria-pressed="${categoryType === 'income'}" data-type="income" data-cat-switch>收入</button>
           </span>
         </div>
-        ${cats.length ? cats.map((c) => `
+        ${cats.length ? cats.map((c) => c.offset ? offsetCat(c.name, c.total) : `
           <div class="cat">
             <span class="cat-name">${esc(c.name)}</span>
             <span class="cat-pct">${Math.round((c.total / catTotal) * 100)}%</span>

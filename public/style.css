@@ -339,6 +339,7 @@ main { flex: 1; padding: 14px 16px calc(76px + var(--safe-b)); }
 .cat-bar { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .cat-bar span { display: block; height: 100%; background: var(--accent); }
 .cat-amount { font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.cat.is-offset .cat-amount { color: var(--income); }
 
 /* ---------- 表單 ---------- */
 

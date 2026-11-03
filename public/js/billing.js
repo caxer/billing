@@ -1,5 +1,5 @@
 // 月結的純計算與分類對應；歷史合計與新交易永遠擇一使用。
-import { shiftMonth, isAdjustment } from './calc.js';
+import { shiftMonth, isAdjustment, byCategory } from './calc.js';
 import { ruleCategory, childName, escapeRegExp } from './rules.js';
 export const GROUPS = ['日常', '房', '女兒', '兒子', '水電氣'];
 /** 日常的分類（食衣住行育樂），固定順序。 */
@@ -30,6 +30,19 @@ export const ACCOUNTS = [UTILITY_PAYER, POST_PAYER];
 export const memberSpend = (items, person) => items.reduce((sum, it) => sum + (isAdjustment(it) ? 0
   : it.type === 'expense' && it.by === person ? it.amount
     : it.type === 'income' && it.from === person && ACCOUNTS.includes(it.by) ? it.amount : 0), 0);
+/** 紀錄有沒有用到這位記帳人：自己記的（by），或從他轉進帳戶的錢（from）。 */
+export const usesPerson = (it, person) => it.by === person || it.from === person;
+/** 記帳人改名：by 與 from 都改（memberSpend、公積金帳的轉帳用 from 對名字），回傳改了幾筆。 */
+export function renamePerson(items, from, to) {
+  let count = 0;
+  for (const it of items) {
+    if (!usesPerson(it, from)) continue;
+    if (it.by === from) it.by = to;
+    if (it.from === from) it.from = to;
+    count++;
+  }
+  return count;
+}
 /** 歷史轉入的房、女兒、兒子與日常由公積金支付，記在公積金名下。 */
 export const FUND_PAYER = '公積金';
 /** 原表 12 月記在公、婆名下的「年末均攤」：補平全年超支的額外加入，不算進當年赤盈，也不是家庭收入。 */
@@ -129,7 +142,7 @@ export function upgradeSettings(value) {
 }
 
 export function transactionSummary(items, mappings = {}) {
-  const result = { daily: 0, house: 0, daughter: 0, son: 0, utilities: 0, monthlyTotal: 0, total: 0, income: 0, details: [], incomeDetails: [] };
+  const result = { daily: 0, house: 0, daughter: 0, son: 0, utilities: 0, monthlyTotal: 0, total: 0, income: 0, fundIncome: 0, details: [], incomeDetails: [] };
   const keys = { 日常: 'daily', 房: 'house', 女兒: 'daughter', 兒子: 'son', 水電氣: 'utilities' };
   const details = new Map();
   const incomes = new Map();
@@ -139,6 +152,7 @@ export function transactionSummary(items, mappings = {}) {
     // 記在公積金名下的收入（儲值、發票中獎、與原表差額）沿用原表算法，抵扣當月日常。
     if (it.type === 'income' && it.by === FUND_PAYER) {
       result.daily -= it.amount;
+      result.fundIncome += it.amount;
       const key = JSON.stringify(['日常', it.category]);
       const detail = details.get(key) || { group: '日常', item: it.category, amount: 0, note: '' };
       detail.amount -= it.amount;
@@ -164,6 +178,20 @@ export function transactionSummary(items, mappings = {}) {
   result.details = [...details.values()];
   result.incomeDetails = [...incomes.values()];
   return result;
+}
+
+/** 公積金名下收入抵扣日常的那一行：分類列表裡另列成負數（offset），分類合計加這一行＝支出格。 */
+export const FUND_OFFSET = '公積金抵扣';
+
+/**
+ * 本月頁的分類佔比，由大到小。收入和收入格同一套規則（transactionSummary 的 incomeDetails）：
+ * 轉進帳戶、年末均攤、公積金名下收入都不算。支出是各分類的原始金額，最後另列公積金抵扣。
+ */
+export function categoryShare(items, type, mappings = {}) {
+  const summary = transactionSummary(items, mappings);
+  if (type === 'income') return summary.incomeDetails.map((d) => ({ name: d.item, total: d.amount })).sort((a, b) => b.total - a.total);
+  const list = byCategory(items, 'expense');
+  return summary.fundIncome ? [...list, { name: FUND_OFFSET, total: -summary.fundIncome, offset: true }] : list;
 }
 
 export function validateHistory(data) {
@@ -482,8 +510,10 @@ export function fundSettlement({ ledger, history = {}, year }) {
   const total = shares[0].balance + shares[1].balance;
   const pays = total < 0 ? halves(-total) : null;
   if (pays) shares.forEach((sh, i) => Object.assign(sh, { pay: pays[i], note: settleNote(sh.balance, pays[i]) }));
-  return { year, through: months.at(-1).month, shares, total, recorded: shares.some((sh) => sh.settled),
-    next: pays ? [0, 0] : shares.map((sh) => sh.balance) };
+  const recorded = shares.some((sh) => sh.settled);
+  // 記了年末均攤才歸零；還沒記（或忘了記）時和公積金帳一樣，各自的赤盈整筆轉入下一年。
+  return { year, through: months.at(-1).month, shares, total, recorded,
+    next: pays && recorded ? [0, 0] : shares.map((sh) => sh.balance) };
 }
 
 /**
@@ -603,6 +633,8 @@ export function shareSummary(items, mappings = {}, top = 10, by = 'amount', pick
     notes.set(store, entry);
   }
   const categoryList = [...categories].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+  // 大項的日常已扣公積金名下收入；分類維持原始金額，另列一行抵扣，合計才等於家庭總支出。
+  if (summary.fundIncome) categoryList.push({ name: FUND_OFFSET, amount: -summary.fundIncome, offset: true });
   // 日常依食衣住行育樂醫其他的固定順序，再接其他大項。
   const picks = [...DAILY_ORDER.filter((c) => categories.get(c) && groupOf.get(c) === '日常'), ...GROUPS.filter((g) => g !== '日常' && groupTotals.get(g))];
   return {

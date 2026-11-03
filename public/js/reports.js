@@ -3,7 +3,7 @@ import * as billing from './billing.js';
 import { monthKey, money, isAdjustment } from './calc.js';
 import { ReportCharts } from './report-charts.js';
 import { esc } from './html.js';
-import { expenseTile } from './views.js';
+import { expenseTile, offsetCat } from './views.js';
 const amount = (n) => n === null || n === undefined ? '—' : money(n);
 let root, context, year = monthKey().slice(0, 4), mode = 'year', detailMonth = null, shareScope = 'year', shareTop = 'amount', sharePick = '食';
 let archive = null, archiveSha = null, changedData = false, shownError = '';
@@ -273,12 +273,13 @@ function shareView() {
     `<button type="button" class="seg-btn ${shareScope === key ? 'is-on' : ''}" data-share-scope="${key}" aria-pressed="${shareScope === key}">${label}</button>`).join('');
   const range = months.length ? `${months[0]}～${months.at(-1)} · ${months.length} 個月` : '沒有資料';
   const bar = (name, value, total, extra = '', color = '', scale = total, search = null) => `<div class="cat${search ? ' cat-link' : ''}"${search ? ` data-search="${esc(search[0])}" data-search-cat="${esc(search[1] || '')}" role="button" tabindex="0" title="到明細看全部紀錄"` : ''}><span class="cat-name">${esc(name)}${extra}</span><span class="cat-pct">${total ? (value / total * 100).toFixed(1) : 0}%</span><span class="cat-amount">${money(value)}</span><span class="cat-bar"><span style="width:${scale ? Math.max(0, value / scale * 100) : 0}%${color ? `;background:${color}` : ''}"></span></span></div>`;
-  const catTotal = s.categories.reduce((sum, c) => sum + c.amount, 0);
+  // 分類占比只算原始分類；公積金抵扣另列一行，分類合計加它＝家庭總支出。
+  const catTotal = s.categories.reduce((sum, c) => sum + (c.offset ? 0 : c.amount), 0);
   const topTotal = s.topTotal;
   const top = s.top.map((t, i) => bar(`${i + 1}. ${t.name}`, t.amount, topTotal, `<small class="share-count">${t.count} 筆 · 平均 ${money(Math.round(t.amount / t.count))}${t.parts.length > 1 ? ` · ${t.parts.slice(0, 3).map((p) => `${esc(p.name || '未寫品項')} ${p.count}`).join('、')}` : ''}</small>`, '', s.top[0].amount, [t.name, billing.GROUPS.includes(sharePick) ? '' : sharePick])).join('');
   return `<div class="card"><div class="section-head"><h3 class="section-title">大項占比</h3><span class="seg share-scope" role="group" aria-label="占比範圍">${scopeButtons}</span></div><p class="setting-hint">${range} · 家庭總支出 ${amount(s.total)}</p>${s.groups.length ? s.groups.map((g) => bar(g.name, g.amount, s.total, '', g.color)).join('') : '<p class="empty">沒有支出</p>'}</div>
     <div class="card"><div class="section-head"><h3 class="section-title" title="占所選類別支出的比例；依備註空格前的店名合計，例如 7-11、7-11 早餐都算 7-11">${esc(sharePick)} Top 10</h3><span class="seg share-top" role="group" aria-label="排行依據">${[['amount', '金額'], ['count', '次數']].map(([key, label]) => `<button type="button" class="seg-btn ${shareTop === key ? 'is-on' : ''}" data-share-top="${key}" aria-pressed="${shareTop === key}">${label}</button>`).join('')}</span></div><div class="share-picks" role="group" aria-label="排行的類別">${s.picks.map((p) => `<button type="button" class="chip${p === sharePick ? ' is-on' : ''}" data-share-pick="${esc(p)}" aria-pressed="${p === sharePick}">${esc(p)}</button>`).join('')}</div>${top || `<p class="empty">${esc(sharePick)}沒有寫內容的紀錄</p>`}</div>
-    <div class="card"><h3 class="section-title">分類占比</h3>${s.categories.map((c) => bar(c.name, c.amount, catTotal, '', '', catTotal, ['', c.name])).join('') || '<p class="empty">沒有支出</p>'}</div>`;
+    <div class="card"><h3 class="section-title">分類占比</h3>${s.categories.map((c) => c.offset ? offsetCat(c.name, c.amount) : bar(c.name, c.amount, catTotal, '', '', catTotal, ['', c.name])).join('') || '<p class="empty">沒有支出</p>'}</div>`;
 }
 
 /** 存摺／網銀明細最後核對到哪天（設定 reconciled），之後的交易還沒對帳，下次從隔天補。 */
