@@ -4,6 +4,7 @@ import * as calc from './calc.js';
 import { budgetFor, all as allSettings } from './settings.js';
 import { transactionSummary, categoryShare, memberSpend, UTILITY_PAYER, isMember, utilityBudget, DAILY_ORDER, BILLING_CATEGORIES } from './billing.js';
 import { esc } from './html.js';
+import { holidayName } from './holidays.js';
 
 const changeSub = (cur, prev) => {
   if (prev === 0) return null;
@@ -240,7 +241,7 @@ function noteRow(it, today, count = 1) {
 }
 
 /**
- * 月曆標出有記事的日子（重複的記事每一次都標）；下面列即將到來（還剩幾天）與已過（距今幾天，同名只列最近一次）。
+ * 月曆標出有記事的日子（重複的記事每一次都標）與放假日（紅字，名稱在 tooltip 與選取那天的標題）；下面列即將到來（還剩幾天）與已過（距今幾天，同名只列最近一次）。
  * 重複的記事只在即將到來列下一次。點日子只看那天。
  */
 export function calendar(month, notes, selected = '') {
@@ -254,8 +255,10 @@ export function calendar(month, notes, selected = '') {
   for (let d = 1; d <= calc.dayCount(month); d++) {
     const date = `${month}-${String(d).padStart(2, '0')}`;
     const list = byDate.get(date) || [];
-    const cls = `${date === today ? ' is-today' : ''}${date === selected ? ' is-on' : ''}${list.length ? ' has-note' : ''}`;
-    cells.push(`<button type="button" class="cal-day${cls}" data-date="${date}" aria-pressed="${date === selected}" aria-label="${m} 月 ${d} 日${list.length ? `，${list.length} 則記事` : ''}"${list.length ? ` title="${esc(list.map((it) => it.note).join('、'))}"` : ''}>${d}</button>`);
+    const holiday = holidayName(date);
+    const cls = `${date === today ? ' is-today' : ''}${date === selected ? ' is-on' : ''}${list.length ? ' has-note' : ''}${holiday ? ' is-holiday' : ''}`;
+    const title = [holiday, ...list.map((it) => it.note)].filter(Boolean).join('、');
+    cells.push(`<button type="button" class="cal-day${cls}" data-date="${date}" aria-pressed="${date === selected}" aria-label="${m} 月 ${d} 日${holiday ? `，${holiday}` : ''}${list.length ? `，${list.length} 則記事` : ''}"${title ? ` title="${esc(title)}"` : ''}>${d}</button>`);
   }
 
   const section = (title, rows) => rows.length ? `<p class="section-title">${title}</p><ul class="list">${rows.join('')}</ul>` : '';
@@ -285,7 +288,7 @@ export function calendar(month, notes, selected = '') {
         <div class="cal-grid" role="group" aria-label="${calc.monthLabel(month)}">${cells.join('')}</div>
       </div>
       <div class="cal-head">
-        ${selected ? `<p class="filter-chip">${calc.dateLabel(selected)} <button type="button" class="text-button" id="cal-clear" aria-label="看全部記事">✕</button></p>` : '<span></span>'}
+        ${selected ? `<p class="filter-chip">${calc.dateLabel(selected)}${holidayName(selected) ? ` · ${holidayName(selected)}` : ''} <button type="button" class="text-button" id="cal-clear" aria-label="看全部記事">✕</button></p>` : '<span></span>'}
         <button type="button" class="btn-quiet" id="cal-add" title="${selected ? '在這天記一則' : '記一則，例如換濾心'}">＋ 記事</button>
       </div>
       ${body}

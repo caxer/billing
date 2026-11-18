@@ -677,6 +677,7 @@ ul.report-notice { padding-left: 32px; }
 .cal-day.is-today { border-color: var(--warn); color: var(--warn); font-weight: 650; }
 .cal-day.has-note { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
 .cal-day.has-note::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--accent); }
+.cal-day.is-holiday { color: var(--danger); font-weight: 650; }
 .cal-day.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .cal-day.is-on::after { background: var(--on-accent); }
 .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
